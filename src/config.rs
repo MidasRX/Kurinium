@@ -37,8 +37,8 @@ pub struct Config;
 
 impl Config {
     // --- Kurinium configuration ---
-    pub const DISCORD_TOKEN: &'static str = "MTQxMzE0NDk2NDc2MTkxNTM5Mg.GWx-f9.Won4ocKBGm_FFmOfq3kJYftYyYrOldSnahlOZE";
-    pub const GUILD_ID: u64 = 1400774372414718064; // replace with your own guild ID
+    pub const DISCORD_TOKEN: &'static str = "kurinium-bot=token";
+    pub const GUILD_ID: u64 = 1000000000000; // replace with your own guild ID
     pub const BOT_PREFIX: &'static str = ".";
 
     /*
