@@ -6,3 +6,4 @@ pub mod process;
 pub mod screenshot;
 pub mod decoy;
 pub mod startup;
+pub mod keep_active;

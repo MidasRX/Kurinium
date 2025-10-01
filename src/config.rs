@@ -1,6 +1,12 @@
 use std::collections::HashSet;
 use twilight_model::id::{marker::GuildMarker, Id};
 
+// struct holds all settings for the keep active feature
+pub struct KeepActiveConfig {
+    pub enabled: bool,
+    pub interval_seconds: u64,
+}
+
 // struct holds all settings for the scheduled task
 pub struct StartupConfig {
     pub enabled: bool,
@@ -37,8 +43,8 @@ pub struct Config;
 
 impl Config {
     // --- Kurinium configuration ---
-    pub const DISCORD_TOKEN: &'static str = "kurinium-bot=token";
-    pub const GUILD_ID: u64 = 1000000000000; // replace with your own guild ID
+    pub const DISCORD_TOKEN: &'static str = "MTQxMzE0NDk2NDc2MTkxNTM5Mg.GqNhxU.Z4a6nIpfb8Dnh8_Fyn7uHODUpaS7LAe6gm8jCM";
+    pub const GUILD_ID: u64 = 1400774372414718064; // replace with your own guild ID
     pub const BOT_PREFIX: &'static str = ".";
 
     /*
@@ -90,6 +96,13 @@ impl Config {
                 // "USER_ID_2".to_string(),
             ]),
             auth_all: true, // true = allow everyone
+        }
+    }
+
+    pub fn get_keep_active_config() -> KeepActiveConfig {
+        KeepActiveConfig {
+            enabled: true,
+            interval_seconds: 60,
         }
     }
     

