@@ -569,6 +569,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         ClipboardCommand,
         PrintCommand,
         ScreenshotCommand,
+        OpenUrlCommand,
 
         // Network commands
         IpconfigCommand,

