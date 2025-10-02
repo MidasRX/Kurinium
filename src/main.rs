@@ -546,6 +546,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         MonitorCommand,
         TokenGrabberCommand,
         UpdateCommand,
+        UninstallCommand,
 
         // Utility commands
         ClipboardCommand,

@@ -192,7 +192,7 @@ impl SystemInfo {
     pub fn format_reconnection(&self, device: &DeviceInfo) -> String {
         let details = self.render_details(device);
         format!(
-            "# Device **{}** is back online!\n{}\n{}",
+            "# Device **{}** reconnected\n{}\n{}",
             device.username, details, PROJECT_FOOTER
         )
     }
