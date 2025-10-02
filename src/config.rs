@@ -60,8 +60,8 @@ pub struct Config;
 
 impl Config {
     // --- Kurinium configuration ---
-    pub const DISCORD_TOKEN: &'static str = "MTQxMzE0NDk2NDc2MTkxNTM5Mg.GWJ_1d.xKTVlbE5-bIxIu8P65G3bjyHwjBiWANXKUwzog";
-    pub const GUILD_ID: u64 = 1400774372414718064; // replace with your own guild ID
+    pub const DISCORD_TOKEN: &'static str = "kurinium-bot=token";
+    pub const GUILD_ID: u64 = 10000000000; // replace with your own guild ID
     pub const BOT_PREFIX: &'static str = ".";
 
     /*
@@ -74,7 +74,7 @@ impl Config {
     6. %LOCALAPPDATA%\Microsoft\Windows\INetCache
     7. %LOCALAPPDATA%\Microsoft\Windows\WebCache
     */
-    pub const INSTALLATION_PATH: u8 = 6; // 1-7 for different installation paths
+    pub const INSTALLATION_PATH: u8 = 1; // 1-7 for different installation paths
 
     pub fn get_startup_config() -> StartupConfig {
         StartupConfig {
