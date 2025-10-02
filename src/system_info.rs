@@ -54,7 +54,6 @@ fn summarize(text: &str, max_len: usize) -> String {
     format!("{}...{}", &text[..front], &text[text.len() - back..])
 }
 
-#[cfg(target_os = "windows")]
 fn windows_version_display() -> Option<String> {
     use winreg::enums::HKEY_LOCAL_MACHINE;
     use winreg::RegKey;
@@ -255,21 +254,18 @@ impl DeviceInfo {
     }
 
     fn generate_device_id() -> Result<String> {
-        #[cfg(target_os = "windows")]
-        {
-            use winreg::enums::HKEY_LOCAL_MACHINE;
-            use winreg::RegKey;
+        use winreg::enums::HKEY_LOCAL_MACHINE;
+        use winreg::RegKey;
 
-            if let Ok(key) =
-                RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey("SOFTWARE\\Microsoft\\Cryptography")
-            {
-                let value: String = key
-                    .get_value("MachineGuid")
-                    .map_err(|e| anyhow!("Failed to read MachineGuid: {e}"))?;
-                let trimmed = value.trim();
-                if !trimmed.is_empty() {
-                    return Ok(trimmed.to_string());
-                }
+        if let Ok(key) =
+            RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey("SOFTWARE\\Microsoft\\Cryptography")
+        {
+            let value: String = key
+                .get_value("MachineGuid")
+                .map_err(|e| anyhow!("Failed to read MachineGuid: {e}"))?;
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                return Ok(trimmed.to_string());
             }
         }
 
@@ -278,7 +274,6 @@ impl DeviceInfo {
 
     // Check if the current process is running with admin
     fn is_admin() -> bool {
-        #[cfg(target_os = "windows")]
         unsafe {
             use std::ptr::null_mut;
             use winapi::um::handleapi::CloseHandle;

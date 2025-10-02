@@ -161,44 +161,41 @@ impl BotCommand for InfoCommand {
 
 impl InfoCommand {
     fn check_startup_status() -> String {
-        #[cfg(target_os = "windows")]
+        use crate::config::Config;
+        use std::os::windows::process::CommandExt;
+        
+        let startup_config = Config::get_startup_config();
+        
+        if !startup_config.enabled {
+            return "Disabled".to_string();
+        }
+        
+        let task_name = startup_config.task_name;
+        
+        // try w /fo LIST format for better parsing
+        match Command::new("schtasks")
+            .args(["/query", "/tn", task_name, "/fo", "LIST"])
+            .creation_flags(0x08000000)
+            .output()
         {
-            use crate::config::Config;
-            use std::os::windows::process::CommandExt;
-            
-            let startup_config = Config::get_startup_config();
-            
-            if !startup_config.enabled {
-                return "Disabled".to_string();
-            }
-            
-            let task_name = startup_config.task_name;
-            
-            // try w /fo LIST format for better parsing
-            match Command::new("schtasks")
-                .args(["/query", "/tn", task_name, "/fo", "LIST"])
-                .creation_flags(0x08000000)
-                .output()
-            {
-                Ok(output) => {
-                    if output.status.success() {
-                        let stdout = String::from_utf8_lossy(&output.stdout);
-                        if stdout.contains(task_name) {
-                            "Active".to_string()
-                        } else {
-                            "Not Found".to_string()
-                        }
+            Ok(output) => {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    if stdout.contains(task_name) {
+                        "Active".to_string()
                     } else {
-                        let stderr = String::from_utf8_lossy(&output.stderr);
-                        if stderr.contains("ERROR: The system cannot find") {
-                            "Not Found".to_string()
-                        } else {
-                            format!("Error: {}", stderr.lines().next().unwrap_or("Unknown"))
-                        }
+                        "Not Found".to_string()
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    if stderr.contains("ERROR: The system cannot find") {
+                        "Not Found".to_string()
+                    } else {
+                        format!("Error: {}", stderr.lines().next().unwrap_or("Unknown"))
                     }
                 }
-                Err(e) => format!("Check Failed: {}", e)
             }
+            Err(e) => format!("Check Failed: {}", e)
         }
     }
 

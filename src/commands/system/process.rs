@@ -7,6 +7,7 @@ use std::sync::Arc;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::embed::EmbedField;
 use twilight_model::channel::message::Message;
+use twilight_model::http::attachment::Attachment;
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
 
 pub struct ProcessCommand;
@@ -14,10 +15,10 @@ pub struct ProcessCommand;
 #[async_trait]
 impl BotCommand for ProcessCommand {
     fn name(&self) -> &str { "process" }
-    fn description(&self) -> &str { "Manage system processes (list, kill, info)" }
+    fn description(&self) -> &str { "Manage system processes (list, kill, info, installed)" }
     fn category(&self) -> &str { "system" }
-    fn usage(&self) -> &str { ".process <list|kill|info> [pid|name]" }
-    fn examples(&self) -> &'static [&'static str] { &[".process list", ".process kill 1234", ".process info chrome.exe", ".process info 1234"] }
+    fn usage(&self) -> &str { ".process <list|kill|info|installed> [pid|name]" }
+    fn examples(&self) -> &'static [&'static str] { &[".process list", ".process kill 1234", ".process info chrome.exe", ".process info 1234", ".process installed"] }
     fn aliases(&self) -> &'static [&'static str] { &["ps", "proc"] }
 
     async fn execute(
@@ -40,7 +41,7 @@ impl BotCommand for ProcessCommand {
                     })
                     .field(EmbedField {
                         name: "Actions".to_string(),
-                        value: "**list** - List all processes\n**kill** - Kill a process by PID\n**info** - Get detailed process info".to_string(),
+                        value: "**list** - List all processes\n**kill** - Kill a process by PID\n**info** - Get detailed process info\n**installed** - List all installed applications".to_string(),
                         inline: false,
                     })
                     .footer(EmbedFooterBuilder::new("Kurinium System Commands"))
@@ -53,6 +54,7 @@ impl BotCommand for ProcessCommand {
 
         match action {
             "list" => self.list_processes(http, msg).await,
+            "installed" => self.list_installed_apps(http, msg).await,
             "kill" => {
                 let target = match args.next() {
                     Some(target) => target,
@@ -80,7 +82,7 @@ impl BotCommand for ProcessCommand {
             _ => {
                 http.create_message(msg.channel_id)
                     .content(&format!(
-                        "**Error**: Unknown action '{}'. Use: list, kill, or info",
+                        "**Error**: Unknown action '{}'. Use: list, kill, info, or installed",
                         action
                     ))
                     .await?;
@@ -316,6 +318,83 @@ impl ProcessCommand {
                 ))
                 .await?;
         }
+
+        Ok(())
+    }
+
+    async fn list_installed_apps(&self, http: &Arc<HttpClient>, msg: &Message) -> Result<()> {
+        http.create_message(msg.channel_id)
+            .content("Gathering installed applications...")
+            .await?;
+
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let mut apps = Vec::new();
+        // 64
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        if let Ok(uninstall) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
+            for key_name in uninstall.enum_keys().filter_map(|k| k.ok()) {
+                if let Ok(key) = uninstall.open_subkey(&key_name) {
+                    let display_name: Result<String, _> = key.get_value("DisplayName");
+                    let display_version: Result<String, _> = key.get_value("DisplayVersion");
+                    if let Ok(name) = display_name {
+                        let version = display_version.unwrap_or_else(|_| "Unknown".to_string());
+                        apps.push(format!("{} - {}", name, version));
+                    }
+                }
+            }
+        }
+        // 32
+        if let Ok(uninstall) = hklm.open_subkey("SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
+            for key_name in uninstall.enum_keys().filter_map(|k| k.ok()) {
+                if let Ok(key) = uninstall.open_subkey(&key_name) {
+                    let display_name: Result<String, _> = key.get_value("DisplayName");
+                    let display_version: Result<String, _> = key.get_value("DisplayVersion");
+                    if let Ok(name) = display_name {
+                        let version = display_version.unwrap_or_else(|_| "Unknown".to_string());
+                        let app_info = format!("{} - {}", name, version);
+                        if !apps.contains(&app_info) {
+                            apps.push(app_info);
+                        }
+                    }
+                }
+            }
+        }
+        // current user
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(uninstall) = hkcu.open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
+            for key_name in uninstall.enum_keys().filter_map(|k| k.ok()) {
+                if let Ok(key) = uninstall.open_subkey(&key_name) {
+                    let display_name: Result<String, _> = key.get_value("DisplayName");
+                    let display_version: Result<String, _> = key.get_value("DisplayVersion");
+                    if let Ok(name) = display_name {
+                        let version = display_version.unwrap_or_else(|_| "Unknown".to_string());
+                        let app_info = format!("{} - {}", name, version);
+                        if !apps.contains(&app_info) {
+                            apps.push(app_info);
+                        }
+                    }
+                }
+            }
+        }
+        apps.sort();
+        let content = format!(
+            "Installed Applications ({})\n{}\n\n{}",
+            apps.len(),
+            "=".repeat(50),
+            apps.join("\n")
+        );
+        let attachment = Attachment::from_bytes(
+            "installed_apps.txt".to_string(),
+            content.into_bytes(),
+            1
+        );
+        http.create_message(msg.channel_id)
+            .content(&format!("Found {} installed applications", apps.len()))
+            .attachments(&[attachment])
+            .await?;
+        
 
         Ok(())
     }

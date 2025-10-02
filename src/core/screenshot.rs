@@ -9,7 +9,6 @@ impl Screenshot {
         Self::capture_as_bytes_windows()
     }
 
-    #[cfg(target_os = "windows")]
     fn capture_as_bytes_windows() -> Result<(Vec<u8>, String)> {
         let displays = Screen::all().context("Failed to enumerate displays")?;
 

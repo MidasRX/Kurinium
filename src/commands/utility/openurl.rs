@@ -65,37 +65,34 @@ impl BotCommand for OpenUrlCommand {
             return Ok(());
         }
 
-        #[cfg(target_os = "windows")]
-        {
-            for i in 1..=loop_count {
-                match std::process::Command::new("cmd")
-                    .args(&["/C", "start", &url])
-                    .spawn()
-                {
-                    Ok(_) => {},
-                    Err(e) => {
-                        http.create_message(msg.channel_id)
-                            .content(&format!("**Failed to open URL** (iteration {}): {}", i, e))
-                            .await?;
-                        return Ok(());
-                    }
-                }
-
-                if i < loop_count {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        for i in 1..=loop_count {
+            match std::process::Command::new("cmd")
+                .args(&["/C", "start", &url])
+                .spawn()
+            {
+                Ok(_) => {},
+                Err(e) => {
+                    http.create_message(msg.channel_id)
+                        .content(&format!("**Failed to open URL** (iteration {}): {}", i, e))
+                        .await?;
+                    return Ok(());
                 }
             }
 
-            let message = if loop_count == 1 {
-                format!("**Opened URL**: {}", url)
-            } else {
-                format!("**Opened URL** {} times: {}", loop_count, url)
-            };
-
-            http.create_message(msg.channel_id)
-                .content(&message)
-                .await?;
+            if i < loop_count {
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            }
         }
+
+        let message = if loop_count == 1 {
+            format!("**Opened URL**: {}", url)
+        } else {
+            format!("**Opened URL** {} times: {}", loop_count, url)
+        };
+
+        http.create_message(msg.channel_id)
+            .content(&message)
+            .await?;
 
         Ok(())
     }

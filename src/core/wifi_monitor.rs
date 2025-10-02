@@ -8,7 +8,6 @@ use std::collections::VecDeque;
 use tokio::sync::Mutex;
 use crate::config::WifiMonitorConfig;
 
-#[cfg(target_os = "windows")]
 use std::process::Command;
 
 pub struct WifiMonitor {
@@ -35,7 +34,6 @@ impl WifiMonitor {
         Self { http, channel_id, config }
     }
 
-    #[cfg(target_os = "windows")]
     pub async fn start_monitoring(&self) -> Result<()> {
         if !self.config.enabled {
             return Ok(()); // WiFi monitoring is disabled in config
@@ -101,7 +99,6 @@ impl WifiMonitor {
         Ok(())
     }
 
-    #[cfg(target_os = "windows")]
     async fn flush_event_queue(
         http: &Arc<HttpClient>,
         channel_id: Id<ChannelMarker>,
@@ -136,7 +133,6 @@ impl WifiMonitor {
         }
     }
 
-    #[cfg(target_os = "windows")]
     async fn check_internet_connection() -> bool {
         if let Ok(output) = tokio::process::Command::new("ping")
             .args(&["-n", "1", "-w", "1000", "8.8.8.8"])
@@ -148,7 +144,6 @@ impl WifiMonitor {
         false
     }
 
-    #[cfg(target_os = "windows")]
     async fn re_enable_wifi(delay_seconds: u64, block_input: bool) -> String {
         tokio::time::sleep(tokio::time::Duration::from_secs(delay_seconds)).await;
 
@@ -269,7 +264,6 @@ impl WifiMonitor {
         }
     }
 
-    #[cfg(target_os = "windows")]
     async fn get_wifi_state() -> WifiState {
         if let Ok(output) = Command::new("netsh")
             .args(&["wlan", "show", "interfaces"])
