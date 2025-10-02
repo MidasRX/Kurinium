@@ -346,9 +346,22 @@ fn run_powershell_script_as_admin(script_path: &Path) -> anyhow::Result<()> {
     }
 }
 
+fn check_if_installed(current_exe: &Path) -> bool {
+    let exe_name = Config::get_exe_name();
+    let current_exe_name = current_exe.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    if current_exe_name == exe_name {
+        return true;
+    }
+
+    false
+}
+
 fn install_to_path() -> anyhow::Result<()> {
     let current_exe = env::current_exe()?;
-    let exe_name = Config::get_exe_name(); 
+    let exe_name = Config::get_exe_name();
 
     // Installatibn path
     match Config::INSTALLATION_PATH {
@@ -613,7 +626,11 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    if is_admin_privileged {
+    // Check if we're running from the installation directory
+    let current_exe = env::current_exe().unwrap_or_default();
+    let is_installed = check_if_installed(&current_exe);
+
+    if is_admin_privileged && !is_installed {
         if Config::SHOW_CONSOLE {
             println!("Starting installation process...");
         }
@@ -646,10 +663,18 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-    } else {
+
+        // Installation complete - exit and let the installed version run
         if Config::SHOW_CONSOLE {
-            println!("Skipping installation - admin privileges required");
+            println!("Installation complete. Exiting original process...");
+            std::thread::sleep(std::time::Duration::from_secs(2));
         }
+        std::process::exit(0);
+    } else if !is_admin_privileged && !is_installed {
+        if Config::SHOW_CONSOLE {
+            println!("Not installed and no admin privileges - exiting");
+        }
+        std::process::exit(1);
     }
 
     // Hide console if configured

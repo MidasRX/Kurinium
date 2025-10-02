@@ -12,7 +12,10 @@ fn main() -> Result<()> {
             .lines()
             .find(|line| line.trim().starts_with(&format!("{}:", key)))
             .and_then(|line| line.split(':').nth(1))
-            .and_then(|val| val.trim().trim_matches(',').trim_matches('"').split('/').next())
+            .and_then(|val| {
+                let cleaned = val.split("//").next().unwrap_or(val);
+                Some(cleaned.trim().trim_matches(',').trim_matches('"'))
+            })
             .unwrap_or("")
             .to_string()
     };
