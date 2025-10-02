@@ -4,7 +4,7 @@ version = "0.2.5"
 edition = "2021"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = { version = "0.3", features = ["wincon", "winuser", "processthreadsapi", "handleapi", "winnt", "securitybaseapi", "winspool"] }
+winapi = { version = "0.3", features = ["winbase", "wincon", "winuser", "processthreadsapi", "handleapi", "winnt", "securitybaseapi", "winspool"] }
 
 [dependencies]
 twilight-gateway = "0.16"
@@ -36,3 +36,8 @@ gethostname = "0.4.3"
 winreg = "0.55.0"
 regex = "1"
 uuid = { version = "1.0", features = ["v4"] }
+winres = "0.1"
+
+[build-dependencies]
+winres = "0.1"
+anyhow = "1.0"

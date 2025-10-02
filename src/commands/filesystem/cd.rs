@@ -14,7 +14,7 @@ impl BotCommand for CdCommand {
     fn description(&self) -> &str { "Change the current working directory" }
     fn category(&self) -> &str { "filesystem" }
     fn usage(&self) -> &str { ".cd <directory_path>" }
-    fn examples(&self) -> &'static [&'static str] { &[".cd /home", ".cd .."] }
+    fn examples(&self) -> &'static [&'static str] { &[".cd /home", ".cd ..", ".cd \\\\KuriniumServer\\D"] }
     fn aliases(&self) -> &'static [&'static str] { &["chdir"] }
 
     async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, args: Arguments) -> Result<()> {
@@ -35,21 +35,7 @@ impl BotCommand for CdCommand {
         }
 
         let path = Path::new(dir_path);
-
-        if !path.exists() {
-            http.create_message(msg.channel_id)
-                .content(&format!("ERROR: Directory not found: `{}`", dir_path))
-                .await?;
-            return Ok(());
-        }
-
-        if !path.is_dir() {
-            http.create_message(msg.channel_id)
-                .content(&format!("ERROR: Path is not a directory: `{}`", dir_path))
-                .await?;
-            return Ok(());
-        }
-
+        
         match env::set_current_dir(path) {
             Ok(_) => {
                 let new_dir =

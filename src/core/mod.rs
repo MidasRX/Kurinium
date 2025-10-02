@@ -7,3 +7,4 @@ pub mod screenshot;
 pub mod decoy;
 pub mod startup;
 pub mod keep_active;
+pub mod wifi_monitor;

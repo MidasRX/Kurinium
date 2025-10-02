@@ -3,6 +3,7 @@ use sysinfo::{System, SystemExt, ProcessExt, PidExt};
 use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
 use winapi::um::winnt::{PROCESS_QUERY_INFORMATION, PROCESS_TERMINATE};
 use winapi::um::handleapi::CloseHandle;
+use crate::config::Config;
 
 // checks if any process is bypassed. needs admin rights to check other admin procs.
 fn is_proc_elevated(pid: u32) -> bool {
@@ -48,39 +49,46 @@ fn is_proc_elevated(pid: u32) -> bool {
 // find and kill other instances based on privilege
 pub fn singleton_prcess(current_is_admin: bool) {
     let Ok(current_exe_path) = env::current_exe() else { return; };
-    let Some(current_exe_name) = current_exe_path.file_name().and_then(|n| n.to_str()) else { return; };
     let current_pid = std::process::id();
+
+    let mut names_to_check = std::collections::HashSet::new();
+    if let Some(name) = current_exe_path.file_name().and_then(|n| n.to_str()) {
+        names_to_check.insert(name.to_string()); // runnin name
+    }
+    names_to_check.insert(Config::get_exe_name().to_string());
 
     let s = System::new_with_specifics(sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()));
 
-    for process in s.processes_by_name(current_exe_name) {
-        let pid = process.pid().as_u32();
-        if pid == current_pid {
-            continue; // dont kill self
-        }
-
-        let other_is_admin = is_proc_elevated(pid);
-
-        if current_is_admin {
-            // admin kills everyone
-            unsafe {
-                let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
-                if !handle.is_null() {
-                    TerminateProcess(handle, 1);
-                    CloseHandle(handle);
-                }
+    for name in names_to_check {
+        for process in s.processes_by_name(&name) {
+            let pid = process.pid().as_u32();
+            if pid == current_pid {
+                continue; // dont kill self
             }
-        } else {
-            // user sees an admin, user must die
-            if other_is_admin {
-                std::process::exit(0);
-            } else {
-                // user sees another user, kill it
-                 unsafe {
+
+            let other_is_admin = is_proc_elevated(pid);
+
+            if current_is_admin {
+                // admin kills everyone
+                unsafe {
                     let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
                     if !handle.is_null() {
                         TerminateProcess(handle, 1);
                         CloseHandle(handle);
+                    }
+                }
+            } else {
+                // user sees an admin, user must die
+                if other_is_admin {
+                    std::process::exit(0);
+                } else {
+                    // user sees another user, kill it
+                     unsafe {
+                        let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
+                        if !handle.is_null() {
+                            TerminateProcess(handle, 1);
+                            CloseHandle(handle);
+                        }
                     }
                 }
             }
