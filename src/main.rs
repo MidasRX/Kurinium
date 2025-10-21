@@ -549,12 +549,18 @@ async fn register_all_commands() -> anyhow::Result<()> {
         // Filesystem commands
         CatCommand,
         CdCommand,
+        CheckDriveCommand,
         ClearCommand,
         DownloadCommand,
+        FileInfoCommand,
+        GetCommand,
         LsCommand,
         MkdirCommand,
         RemoveCommand,
         RenameCommand,
+        SizeCommand,
+        UnrarCommand,
+        UnzipCommand,
         UploadCommand,
         ZipCommand,
 

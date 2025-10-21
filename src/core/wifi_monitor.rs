@@ -255,7 +255,7 @@ impl WifiMonitor {
             .output()
             .await
         {
-            Ok(output) => {
+            Ok(_output) => {
                 return format!("**Auto reconnect successfully~!**");
             }
             Err(e) => {
