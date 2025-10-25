@@ -2,8 +2,6 @@
   <img src="assets/readme/Kurinium.png" width="622" />
 </div>
 
-<h1 align="center">Kurinium</h1>
-
 <p align="center">
   <strong>Fast and Modern</strong> Rust-based <strong>Remote Administration Tool</strong><br/>
   Controlled with <a href="https://github.com/twilight-rs/twilight">Twilight-rs</a>
