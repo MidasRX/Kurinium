@@ -80,6 +80,7 @@ MIT License - Use freely, but please give credit where due.
 ---
 
 <div align="center">
+  <img src="assets/readme/Ending.png" width="622" /><br />
   <em>“No matter where you go… everyone is connected.”</em><br>
   <sub>Built with <3 - Kukuri</sub>
 </div>
