@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/readme/Kurinium.png" width="622" />
+</div>
+
 <h1 align="center">Kurinium</h1>
 
 <p align="center">
@@ -6,8 +10,8 @@
 </p>
 
 <p align="center">
-  <img src="img/1.png" alt="Kukurinium" width="500"/>
-  <br/>
+  <img src="assets/readme/Builder.png" alt="Kukurinium" width="500"/>
+  <br/><i>Builder for Kurinium~!</i><br/><br/>
   <a href="https://www.rust-lang.org/">
     <img src="https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/>
   </a>
@@ -23,7 +27,9 @@
 
 ---
 
-## What is Kurinium?
+<div align="left">
+  <img src="assets/readme/What is.png" width="622" />
+</div>
 
 Kurinium is a **Rust-based** project, newer and better than the legacy C++ version. 
 
