@@ -39,6 +39,8 @@ Kurinium is a **Rust-based** project, newer and better than the legacy C++ versi
 
 ---
 
+<img src="assets/readme/Vertical.png" width="290" align="right" />
+
 ## Quick Start
 
 ### Prerequisites
