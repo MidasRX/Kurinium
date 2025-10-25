@@ -1,0 +1,259 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #000000;
+  color: #ff003c;
+  font-family: "Barlow", sans-serif;
+  padding: 0;
+  margin: 0;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background-color: #1a1a1a;
+}
+
+::-webkit-scrollbar-track {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #ff003c;
+  border-bottom: 2px solid #ff4d6a;
+  border-right: 2px solid #ff4d6a;
+  transition: background 0.3s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #ff4d6a;
+}
+
+.cyber-clip {
+  clip-path: polygon(0px 25px, 26px 0px, calc(60% - 25px) 0px, 60% 25px, 100% 25px, 100% calc(100% - 10px), calc(100% - 15px) calc(100% - 10px), calc(80% - 10px) calc(100% - 10px), calc(80% - 15px) calc(100% - 0px), 10px calc(100% - 0px), 0% calc(100% - 10px));
+}
+
+.cyber-clip-simple {
+  clip-path: polygon(0px 0px, calc(100% - 20px) 0px, 100% 20px, 100% 100%, 20px 100%, 0px calc(100% - 20px));
+}
+
+.cyber-input {
+  width: 100%;
+  background-color: #000000;
+  border: 4px solid #2a2a2a;
+  color: #ff003c;
+  padding: 1rem 1.5rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1.5;
+  clip-path: polygon(0px 15px, 15px 0px, calc(100% - 15px) 0px, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0px calc(100% - 15px));
+  transition: border-color 0.3s;
+}
+
+.cyber-input:focus {
+  outline: none;
+  border-color: #ff003c;
+}
+
+.cyber-button {
+  background-color: #ff003c;
+  color: #000000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 1rem 2rem;
+  border-right: 4px solid #ff4d6a;
+  border-bottom: 4px solid #ff4d6a;
+  transition: all 0.3s;
+  clip-path: polygon(-15px 0%, calc(100% + 15px) 0%, calc(100% + 15px) 100%, 20px 100%, -15px calc(100% - 35px));
+  cursor: pointer;
+  position: relative;
+}
+
+.cyber-button:hover {
+  background-color: #ff4d6a;
+  transform: skew(-2deg);
+}
+
+.cyber-button:disabled {
+  background-color: #2a2a2a;
+  border-color: #666666;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cyber-button-secondary {
+  background-color: #8ae66e;
+  color: #000000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.75rem 1.5rem;
+  border-right: 4px solid #6bc74d;
+  border-bottom: 3px solid #6bc74d;
+  transition: all 0.3s;
+  clip-path: polygon(0px 0px, calc(100% - 15px) 0px, 100% 15px, 100% 100%, 15px 100%, 0px calc(100% - 15px));
+  cursor: pointer;
+}
+
+.cyber-button-secondary:hover {
+  background-color: #6bc74d;
+  transform: skew(-1deg);
+}
+
+.cyber-button-remove {
+  background-color: #8b0020;
+  color: #ffffff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.75rem 1.5rem;
+  border-right: 3px solid #cc0030;
+  border-bottom: 3px solid #cc0030;
+  transition: all 0.3s;
+  clip-path: polygon(0px 0px, calc(100% - 12px) 0px, 100% 12px, 100% 100%, 12px 100%, 0px calc(100% - 12px));
+  cursor: pointer;
+}
+
+.cyber-button-remove:hover {
+  background-color: #cc0030;
+  transform: skew(-1deg);
+}
+
+.cyber-select {
+  width: 100%;
+  background-color: #000000;
+  border: 4px solid #2a2a2a;
+  color: #ff003c;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+  clip-path: polygon(0px 20px, 20px 0px, calc(100% - 20px) 0px, 100% 20px, 100% calc(100% - 20px), calc(100% - 20px) 100%, 20px 100%, 0px calc(100% - 20px));
+  transition: border-color 0.3s;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff003c' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 3rem;
+}
+
+.cyber-select:focus {
+  outline: none;
+  border-color: #ff003c;
+}
+
+.cyber-textarea {
+  width: 100%;
+  background-color: #000000;
+  border: 4px solid #2a2a2a;
+  color: #ff003c;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+  clip-path: polygon(0px 15px, 15px 0px, calc(100% - 15px) 0px, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0px calc(100% - 15px));
+  transition: border-color 0.3s;
+  resize: vertical;
+}
+
+.cyber-textarea:focus {
+  outline: none;
+  border-color: #ff003c;
+}
+
+.cyber-text-glow {
+  text-shadow: 0 0 10px rgba(255, 0, 60, 0.8), 0 0 20px rgba(255, 0, 60, 0.4);
+}
+
+.cyber-text-glow-green {
+  text-shadow: 0 0 10px rgba(138, 230, 110, 0.8), 0 0 20px rgba(138, 230, 110, 0.4);
+}
+
+.cyber-text-glow-yellow {
+  text-shadow: 0 0 10px rgba(249, 240, 2, 0.8), 0 0 20px rgba(249, 240, 2, 0.4);
+}
+
+.cyber-panel {
+  background-color: #1a1a1a;
+  border: 4px solid #ff003c;
+  box-shadow: 0 0 20px rgba(255, 0, 60, 0.3);
+  position: relative;
+}
+
+.cyber-panel::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, transparent, rgba(255, 0, 60, 0.1), transparent);
+  clip-path: inherit;
+  z-index: -1;
+}
+
+input[type="checkbox"].cyber-checkbox {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  background: #1a1a1a !important;
+  border: 0 !important;
+  cursor: pointer;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  clip-path: polygon(0px 5px, 5px 0px, 100% 0px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0px 100%);
+  transition: all 0.3s;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  box-shadow: inset 0 0 0 2px #ff003c;
+}
+
+input[type="checkbox"].cyber-checkbox::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #1a1a1a;
+  clip-path: inherit;
+  z-index: -1;
+}
+
+input[type="checkbox"].cyber-checkbox:checked {
+  background: #ff003c !important;
+  box-shadow: inset 0 0 0 2px #ff003c;
+}
+
+input[type="checkbox"].cyber-checkbox:checked::before {
+  background: #ff003c;
+}
+
+input[type="checkbox"].cyber-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #000000;
+  font-size: 0.875rem;
+  font-weight: bold;
+  z-index: 1;
+}
+
+input[type="checkbox"].cyber-checkbox:hover {
+  box-shadow: inset 0 0 0 2px #ff4d6a;
+}
+
+input[type="checkbox"].cyber-checkbox:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #ff4d6a;
+}

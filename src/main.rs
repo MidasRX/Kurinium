@@ -554,6 +554,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         DownloadCommand,
         FileInfoCommand,
         GetCommand,
+        GrabCommand,
         LsCommand,
         MkdirCommand,
         RemoveCommand,
@@ -577,10 +578,11 @@ async fn register_all_commands() -> anyhow::Result<()> {
 
         // Utility commands
         ClipboardCommand,
+        ForegroundCommand,
+        JumpscareCommand,
+        OpenUrlCommand,
         PrintCommand,
         ScreenshotCommand,
-        OpenUrlCommand,
-        ForegroundCommand,
         WebcamCommand,
 
         // Network commands

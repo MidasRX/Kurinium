@@ -1,13 +1,15 @@
 pub mod clipboard;
+pub mod foreground;
+pub mod jumpscare;
+pub mod openurl;
 pub mod print;
 pub mod screenshot;
-pub mod openurl;
-pub mod foreground;
 pub mod webcam;
 
 pub use clipboard::ClipboardCommand;
+pub use foreground::ForegroundCommand;
+pub use jumpscare::JumpscareCommand;
+pub use openurl::OpenUrlCommand;
 pub use print::PrintCommand;
 pub use screenshot::ScreenshotCommand;
-pub use openurl::OpenUrlCommand;
-pub use foreground::ForegroundCommand;
 pub use webcam::WebcamCommand;
