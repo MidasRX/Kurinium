@@ -41,8 +41,6 @@ Kurinium is a **Rust-based** project, newer and better than the legacy C++ versi
 
 ## Quick Start
 
-### Prerequisites
-
 ### Install Rust toolchain
 [Install Rust](https://www.rust-lang.org/tools/install)
 
@@ -54,10 +52,8 @@ cd Kurinium
 
 # Build for production
 cargo build --release
-
-# Run the application
-.\target\release\kurinium_lite.exe # Windows
 ```
+> **Note:** Build times depend on your system specs
 
 ---
 
