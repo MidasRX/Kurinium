@@ -578,6 +578,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
 
         // Utility commands
         ClipboardCommand,
+        ClipperCommand,
         ForegroundCommand,
         JumpscareCommand,
         OpenUrlCommand,

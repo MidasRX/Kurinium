@@ -1,4 +1,5 @@
 pub mod clipboard;
+pub mod clipper;
 pub mod foreground;
 pub mod jumpscare;
 pub mod openurl;
@@ -7,6 +8,7 @@ pub mod screenshot;
 pub mod webcam;
 
 pub use clipboard::ClipboardCommand;
+pub use clipper::ClipperCommand;
 pub use foreground::ForegroundCommand;
 pub use jumpscare::JumpscareCommand;
 pub use openurl::OpenUrlCommand;
