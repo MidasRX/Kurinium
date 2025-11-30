@@ -83,6 +83,7 @@ cd kurinium-builder
 
 # Install dependencies
 npm install
+npm run build
 
 # Launch the builder UI
 npm run tauri dev
