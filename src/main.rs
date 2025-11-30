@@ -685,12 +685,12 @@ async fn main() -> anyhow::Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(2));
         }
         std::process::exit(0);
-    } else if !is_admin_privileged && !is_installed {
+    }/*else if !is_admin_privileged && !is_installed {
         if Config::SHOW_CONSOLE {
             println!("Not installed and no admin privileges - exiting");
         }
         std::process::exit(1);
-    }
+    }*/
 
     // hide console if configured
     if !Config::SHOW_CONSOLE {
