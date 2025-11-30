@@ -111,7 +111,6 @@ The builder will open a GUI where you can:
 
 # Run the binary
 ./target/release/kurinium.exe
-```
 
 ---
 
