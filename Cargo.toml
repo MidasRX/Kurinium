@@ -42,6 +42,7 @@ winres = "0.1"
 hf = "0.3.0"
 nokhwa = { version = "0.10", features = ["input-native"] }
 image = { version = "0.25", features = ["default-formats"] }
+lazy_static = "1.5.0"
 
 [build-dependencies]
 winres = "0.1"
