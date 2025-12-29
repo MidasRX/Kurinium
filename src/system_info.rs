@@ -31,14 +31,6 @@ fn format_uptime(seconds: u64) -> String {
     parts.join(" ")
 }
 
-fn permission_label(is_admin: bool) -> &'static str {
-    if is_admin {
-        "Administrator"
-    } else {
-        "Standard"
-    }
-}
-
 fn summarize(text: &str, max_len: usize) -> String {
     if text.len() <= max_len {
         return text.to_string();
@@ -74,6 +66,13 @@ fn windows_version_display() -> Option<String> {
         .unwrap_or_default();
     let build_number: String = key.get_value("CurrentBuild").unwrap_or_default();
     let build_revision: u32 = key.get_value("UBR").unwrap_or(0);
+    let is_win11 = build_number.parse::<u32>().unwrap_or(0) >= 22000;
+
+    let fixed_product_name = if is_win11 && product_name.contains("Windows 10") {
+        product_name.replace("Windows 10", "Windows 11")
+    } else {
+        product_name
+    };
 
     let build = if !build_number.is_empty() {
         if build_revision > 0 {
@@ -88,22 +87,14 @@ fn windows_version_display() -> Option<String> {
     if !display_version.is_empty() && !build.is_empty() {
         Some(format!(
             "{} {} (Build {})",
-            product_name, display_version, build
+            fixed_product_name, display_version, build
         ))
     } else if !build.is_empty() {
-        Some(format!(
-            "{} (Build {})",
-            product_name.replace("Windows 10", "Windows 11"),
-            build
-        ))
+        Some(format!("{} (Build {})", fixed_product_name, build))
     } else if !display_version.is_empty() {
-        Some(format!(
-            "{} {}",
-            product_name.replace("Windows 10", "Windows 11"),
-            display_version
-        ))
+        Some(format!("{} {}", fixed_product_name, display_version))
     } else {
-        Some(product_name.replace("Windows 10", "Windows 11"))
+        Some(fixed_product_name)
     }
 }
 
@@ -206,21 +197,63 @@ impl SystemInfo {
 
     fn render_details(&self, device: &DeviceInfo) -> String {
         let uptime = format_uptime(self.uptime);
-        let permission = permission_label(device.admin_status);
-        let current_dir = summarize(&device.current_directory, 80);
+        let current_dir = summarize(&device.current_directory, 50);
+
+        let mem_used_mb = self.memory_used / (1024 * 1024);
+        let mem_total_mb = self.memory_total / (1024 * 1024);
+        let mem_percent = if self.memory_total > 0 {
+            (self.memory_used as f64 / self.memory_total as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        let os_display = &self.os;
+        let kernel = get_build_number().unwrap_or_else(|| self.kernel.clone());
+        let elevated = if device.admin_status { "Yes" } else { "No" };
 
         format!(
-            "> Computer: {os}\n> User: {user} with {permission} permission.\n> Architecture: {arch}\n> CPU: {cpu} ({cores} cores)\n> Uptime: {uptime}\n> Current Dir: {current_dir}",
-            os = self.os,
-            user = device.username,
-            permission = permission,
-            arch = device.architecture,
-            cpu = self.cpu_name,
-            cores = self.cpu_cores,
-            uptime = uptime,
-            current_dir = current_dir
+            r#"**System Information:**
+```
+Hostname:      {}
+Username:      {}
+OS:            {}
+Kernel:        {}
+Architecture:  {}
+Uptime:        {}
+Memory:        {} MB / {} MB ({:.1}%)
+CPU:           {}
+CPU Cores:     {}
+
+CWD:           {}
+Elevated:      {}
+```"#,
+            device.hostname,
+            device.username,
+            os_display,
+            kernel,
+            device.architecture,
+            uptime,
+            mem_used_mb,
+            mem_total_mb,
+            mem_percent,
+            self.cpu_name,
+            self.cpu_cores,
+            current_dir,
+            elevated
         )
     }
+}
+
+fn get_build_number() -> Option<String> {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let key = hklm
+        .open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion")
+        .ok()?;
+    let build: String = key.get_value("CurrentBuild").ok()?;
+    Some(build)
 }
 
 impl DeviceInfo {
@@ -272,34 +305,8 @@ impl DeviceInfo {
         Ok("unknown-device".to_string())
     }
 
-    // Check if the current process is running with admin
+    // Use shared admin check from utils
     fn is_admin() -> bool {
-        unsafe {
-            use std::ptr::null_mut;
-            use winapi::um::handleapi::CloseHandle;
-            use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
-            use winapi::um::securitybaseapi::GetTokenInformation;
-            use winapi::um::winnt::{TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
-
-            let mut token = null_mut();
-            if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) != 0 {
-                let mut elevation: TOKEN_ELEVATION = std::mem::zeroed();
-                let mut size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
-                let result = GetTokenInformation(
-                    token,
-                    TokenElevation,
-                    &mut elevation as *mut _ as *mut _,
-                    size,
-                    &mut size,
-                );
-                CloseHandle(token);
-                result != 0 && elevation.TokenIsElevated != 0
-            } else {
-                false
-            }
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        false
+        crate::utils::admin::is_admin()
     }
 }

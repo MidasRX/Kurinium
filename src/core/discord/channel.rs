@@ -91,7 +91,7 @@ impl ChannelManager {
             .content(&message)
             .await?;
 
-        if let Err(e) = crate::core::startup::check_startup() {
+        if let Err(e) = crate::core::startup::check_startup().await {
             if Config::SHOW_CONSOLE {
                 info!("Failed to ensure startup persistence: {}", e);
             }

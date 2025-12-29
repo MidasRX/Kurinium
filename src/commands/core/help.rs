@@ -3,10 +3,7 @@ use crate::commands::*;
 use anyhow::Result;
 use async_trait::async_trait;
 use twilight_http::Client as HttpClient;
-use twilight_model::channel::message::embed::EmbedField;
-use twilight_model::channel::message::embed::EmbedFooter;
 use twilight_model::channel::message::Message;
-use twilight_util::builder::embed::EmbedBuilder;
 
 pub struct HelpCommand;
 
@@ -41,43 +38,37 @@ impl HelpCommand {
         let registry = get_registry();
         let categories = registry.get_categories();
 
-        let mut category_fields = Vec::new();
+        let mut messages: Vec<String> = Vec::new();
+        let mut current_msg = String::from("```\n=== COMMAND LIST ===\n\n");
 
         for category in categories {
             let commands = registry.get_commands_by_category(&category);
             if !commands.is_empty() {
-                let command_list = commands
-                    .iter()
-                    .map(|cmd| format!("**{}** - {}", cmd.name, cmd.description))
-                    .collect::<Vec<_>>()
-                    .join("\n");
+                let mut cat_section = format!("[{}]\n", category.to_uppercase());
+                
+                for cmd in commands {
+                    cat_section.push_str(&format!(".{:<12} {}\n", cmd.name, cmd.description));
+                }
+                cat_section.push('\n');
 
-                category_fields.push(EmbedField {
-                    name: format!("**{} Commands**", category.to_uppercase()),
-                    value: command_list,
-                    inline: false,
-                });
+                if current_msg.len() + cat_section.len() + 10 > 1900 {
+                    current_msg.push_str("```");
+                    messages.push(current_msg);
+                    current_msg = format!("```\n{}", cat_section);
+                } else {
+                    current_msg.push_str(&cat_section);
+                }
             }
         }
 
-        let mut embed_builder = EmbedBuilder::new()
-            .title("**Command list**")
-            .description("Here are all the available kurinium commands:")
-            .color(0x0099ff);
+        current_msg.push_str("Use .help <cmd> for details\n```");
+        messages.push(current_msg);
 
-        for field in category_fields {
-            embed_builder = embed_builder.field(field);
+        for content in messages {
+            http.create_message(msg.channel_id)
+                .content(&content)
+                .await?;
         }
-
-        let embed = embed_builder
-            .footer(EmbedFooter {
-                text: "Use .help <command> for more information | Kurinium: <https://github.com/Mikasuru/Kurinium>".to_string(),
-                icon_url: None,
-                proxy_icon_url: None,
-            })
-            .build();
-
-        http.create_message(msg.channel_id).embeds(&[embed]).await?;
 
         Ok(())
     }
@@ -96,43 +87,24 @@ impl HelpCommand {
                 metadata.aliases.join(", ")
             };
 
-            let examples = metadata.examples.join("\n");
+            let examples = metadata.examples.join("\n  ");
 
-            let embed = EmbedBuilder::new()
-                .title(format!("**Help for `{}`**", metadata.name))
-                .description(metadata.description)
-                .color(0x0099ff)
-                .field(EmbedField {
-                    name: "**Usage**".to_string(),
-                    value: metadata.usage,
-                    inline: false,
-                })
-                .field(EmbedField {
-                    name: "**Category**".to_string(),
-                    value: metadata.category,
-                    inline: false,
-                })
-                .field(EmbedField {
-                    name: "**Aliases**".to_string(),
-                    value: aliases,
-                    inline: false,
-                })
-                .field(EmbedField {
-                    name: "**Examples**".to_string(),
-                    value: examples,
-                    inline: false,
-                })
-                .footer(EmbedFooter {
-                    text: "For more help, use .help".to_string(),
-                    icon_url: None,
-                    proxy_icon_url: None,
-                })
-                .build();
+            let output = format!(
+                "```\n=== {} ===\n\n{}\n\nUsage: {}\nCategory: {}\nAliases: {}\n\nExamples:\n  {}\n```",
+                metadata.name.to_uppercase(),
+                metadata.description,
+                metadata.usage,
+                metadata.category,
+                aliases,
+                examples
+            );
 
-            http.create_message(msg.channel_id).embeds(&[embed]).await?;
+            http.create_message(msg.channel_id)
+                .content(&output)
+                .await?;
         } else {
             http.create_message(msg.channel_id)
-                .content(&format!("ERROR: Command `{}` not found. Use `.help` to see all commands.\n-# Kurinium: <https://github.com/Mikasuru/Kurinium>", command_name))
+                .content(&format!("Command '{}' not found. Use .help to see all.", command_name))
                 .await?;
         }
 

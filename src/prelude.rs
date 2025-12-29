@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 // standard library items
 pub use std::sync::Arc;
 

