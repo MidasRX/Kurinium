@@ -16,8 +16,8 @@ pub fn show_fake_error(config: &DecoyConfig) {
         return;
     }
 
-    let title_wide = to_wide(config.title);
-    let message_wide = to_wide(config.message);
+    let title_wide = to_wide(&config.title);
+    let message_wide = to_wide(&config.message);
 
     // map our simple enum to ugly winapi flags
     let icon_flag = match config.icon {

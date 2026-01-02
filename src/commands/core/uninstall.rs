@@ -1,5 +1,6 @@
 use crate::commands::*;
 use crate::config::Config;
+use crate::core::exit_patcher::safe_exit;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::env;
@@ -28,7 +29,7 @@ impl BotCommand for UninstallCommand {
         self.sched_uninstall()?;
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        std::process::exit(0);
+        safe_exit(0);
     }
 }
 

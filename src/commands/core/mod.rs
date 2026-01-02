@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod cpuid;
 pub mod exit;
 pub mod help;
 pub mod info;

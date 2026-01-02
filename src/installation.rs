@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::config::Config;
+use crate::core::exit_patcher::safe_exit;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -62,5 +63,5 @@ pub fn install_to_path() -> anyhow::Result<()> {
     }
 
     std::thread::sleep(std::time::Duration::from_millis(500));
-    std::process::exit(0);
+    safe_exit(0);
 }

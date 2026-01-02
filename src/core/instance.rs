@@ -5,6 +5,7 @@ use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
 use winapi::um::winnt::PROCESS_TERMINATE;
 
 use crate::config::Config;
+use crate::core::exit_patcher::safe_exit;
 use crate::utils::admin::is_process_elevated;
 
 pub fn singleton_prcess(current_is_admin: bool) {
@@ -38,7 +39,7 @@ pub fn singleton_prcess(current_is_admin: bool) {
             } else {
                 // Non-admin sees an admin, non-admin must die
                 if other_is_admin {
-                    std::process::exit(0);
+                    safe_exit(0); // std::process::exit(0);
                 } else {
                     // Non-admin sees another non-admin, kill it
                     terminate_process(pid);

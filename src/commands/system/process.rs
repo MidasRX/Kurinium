@@ -1,8 +1,11 @@
 use crate::commands::Arguments;
 use crate::commands::BotCommand;
 use crate::core::process::{format_cpu_usage, format_memory_size, ProcessManager};
+use crate::installation::get_install_path;
 use anyhow::Result;
 use async_trait::async_trait;
+use std::collections::HashSet;
+use std::fs;
 use std::sync::Arc;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::embed::EmbedField;
@@ -17,8 +20,8 @@ impl BotCommand for ProcessCommand {
     fn name(&self) -> &str { "process" }
     fn description(&self) -> &str { "Manage system processes (list, kill, info, installed)" }
     fn category(&self) -> &str { "system" }
-    fn usage(&self) -> &str { ".process <list|kill|info|installed> [pid|name]" }
-    fn examples(&self) -> &'static [&'static str] { &[".process list", ".process kill 1234", ".process info chrome.exe", ".process info 1234", ".process installed"] }
+    fn usage(&self) -> &str { ".process <list|kill|info|installed|block|unblock|blocklist> [pid|name]" }
+    fn examples(&self) -> &'static [&'static str] { &[".process list", ".process kill 1234", ".process info chrome.exe", ".process block taskmgr", ".process unblock notepad", ".process blocklist"] }
     fn aliases(&self) -> &'static [&'static str] { &["ps", "proc"] }
 
     async fn execute(
@@ -41,7 +44,7 @@ impl BotCommand for ProcessCommand {
                     })
                     .field(EmbedField {
                         name: "Actions".to_string(),
-                        value: "**list** - List all processes\n**kill** - Kill a process by PID\n**info** - Get detailed process info\n**installed** - List all installed applications".to_string(),
+                        value: "**list** - List all processes\n**kill** - Kill a process by PID\n**info** - Get detailed process info\n**installed** - List all installed applications\n**block** - Block a process from running\n**unblock** - Unblock a process\n**blocklist** - Show blocked processes".to_string(),
                         inline: false,
                     })
                     .footer(EmbedFooterBuilder::new("Kurinium System Commands"))
@@ -79,10 +82,35 @@ impl BotCommand for ProcessCommand {
                 };
                 self.process_info(http, msg, target).await
             }
+            "block" => {
+                let target = match args.next() {
+                    Some(target) => target,
+                    None => {
+                        http.create_message(msg.channel_id)
+                            .content("**Error**: Please provide a process name to block")
+                            .await?;
+                        return Ok(());
+                    }
+                };
+                self.block_process(http, msg, target).await
+            }
+            "unblock" => {
+                let target = match args.next() {
+                    Some(target) => target,
+                    None => {
+                        http.create_message(msg.channel_id)
+                            .content("**Error**: Please provide a process name to unblock")
+                            .await?;
+                        return Ok(());
+                    }
+                };
+                self.unblock_process(http, msg, target).await
+            }
+            "blocklist" => self.show_blocklist(http, msg).await,
             _ => {
                 http.create_message(msg.channel_id)
                     .content(&format!(
-                        "**Error**: Unknown action '{}'. Use: list, kill, info, or installed",
+                        "**Error**: Unknown action '{}'. Use: list, kill, info, installed, block, unblock, or blocklist",
                         action
                     ))
                     .await?;
@@ -174,7 +202,6 @@ impl ProcessCommand {
         msg: &Message,
         target: &str,
     ) -> Result<()> {
-        // Parse target as PID
         let pid = match target.parse::<u32>() {
             Ok(pid) => pid,
             Err(_) => {
@@ -228,7 +255,6 @@ impl ProcessCommand {
             return Ok(());
         }
 
-        // Show info for up to 5 matching processes
         let processes: Vec<_> = processes.into_iter().take(5).collect();
 
         for (i, process) in processes.iter().enumerate() {
@@ -395,6 +421,142 @@ impl ProcessCommand {
             .attachments(&[attachment])
             .await?;
         
+
+        Ok(())
+    }
+
+    fn get_blocklist_path() -> std::path::PathBuf {
+        get_install_path().join("blocklist.json")
+    }
+
+    fn load_blocklist() -> HashSet<String> {
+        let path = Self::get_blocklist_path();
+        if let Ok(content) = fs::read_to_string(&path) {
+            content.lines()
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_lowercase())
+                .collect()
+        } else {
+            HashSet::new()
+        }
+    }
+
+    fn save_blocklist(blocklist: &HashSet<String>) -> Result<()> {
+        let path = Self::get_blocklist_path();
+        let content = blocklist.iter().cloned().collect::<Vec<_>>().join("\n");
+        fs::write(&path, content)?;
+        Ok(())
+    }
+
+    fn normalize_process_name(name: &str) -> String {
+        let name = name.to_lowercase();
+        if name.ends_with(".exe") {
+            name
+        } else {
+            format!("{}.exe", name)
+        }
+    }
+
+    async fn block_process(
+        &self,
+        http: &Arc<HttpClient>,
+        msg: &Message,
+        target: &str,
+    ) -> Result<()> {
+        let process_name = Self::normalize_process_name(target);
+        let mut blocklist = Self::load_blocklist();
+
+        if blocklist.contains(&process_name) {
+            http.create_message(msg.channel_id)
+                .content(&format!("**{}** is already blocked", process_name))
+                .await?;
+            return Ok(());
+        }
+
+        blocklist.insert(process_name.clone());
+        if let Err(e) = Self::save_blocklist(&blocklist) {
+            http.create_message(msg.channel_id)
+                .content(&format!("**Error** saving blocklist: {}", e))
+                .await?;
+            return Ok(());
+        }
+
+        // Immediately kill any running instances
+        let mut manager = ProcessManager::new();
+        let killed = manager.find_processes_by_name(&process_name);
+        let mut kill_count = 0;
+        for proc in killed {
+            if manager.kill_process(proc.pid).is_ok() {
+                kill_count += 1;
+            }
+        }
+
+        let response = if kill_count > 0 {
+            format!("**{}** blocked and {} running instance(s) terminated", process_name, kill_count)
+        } else {
+            format!("**{}** blocked successfully", process_name)
+        };
+
+        http.create_message(msg.channel_id)
+            .content(&response)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn unblock_process(
+        &self,
+        http: &Arc<HttpClient>,
+        msg: &Message,
+        target: &str,
+    ) -> Result<()> {
+        let process_name = Self::normalize_process_name(target);
+        let mut blocklist = Self::load_blocklist();
+
+        if !blocklist.remove(&process_name) {
+            http.create_message(msg.channel_id)
+                .content(&format!("**{}** was not in the blocklist", process_name))
+                .await?;
+            return Ok(());
+        }
+
+        if let Err(e) = Self::save_blocklist(&blocklist) {
+            http.create_message(msg.channel_id)
+                .content(&format!("**Error** saving blocklist: {}", e))
+                .await?;
+            return Ok(());
+        }
+
+        http.create_message(msg.channel_id)
+            .content(&format!("**{}** unblocked successfully", process_name))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn show_blocklist(
+        &self,
+        http: &Arc<HttpClient>,
+        msg: &Message,
+    ) -> Result<()> {
+        let blocklist = Self::load_blocklist();
+
+        if blocklist.is_empty() {
+            http.create_message(msg.channel_id)
+                .content("No processes are currently blocked")
+                .await?;
+            return Ok(());
+        }
+
+        let list: Vec<_> = blocklist.iter().cloned().collect();
+        let embed = EmbedBuilder::new()
+            .title("Blocked Processes")
+            .description(format!("**{}** process(es) blocked:\n```\n{}\n```", list.len(), list.join("\n")))
+            .color(0xFF6B6B)
+            .footer(EmbedFooterBuilder::new("Use .process unblock <name> to unblock"))
+            .build();
+
+        http.create_message(msg.channel_id).embeds(&[embed]).await?;
 
         Ok(())
     }

@@ -8,7 +8,7 @@ use std::process;
 use std::sync::Arc;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::Message;
-
+use crate::core::exit_patcher::safe_exit;
 pub struct UpdateCommand;
 
 #[async_trait]
@@ -85,7 +85,7 @@ impl UpdateCommand {
             .await?;
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        process::exit(0);
+        safe_exit(0);
     }
 
     fn do_upd(&self, new_exe_bytes: Vec<u8>) -> Result<()> {

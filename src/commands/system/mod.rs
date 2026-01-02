@@ -6,7 +6,11 @@ pub mod blockinput;
 pub mod screen;
 pub mod capsflicker;
 pub mod visible;
+pub mod host;
+pub mod bsod;
 
+pub use bsod::{BsodCommand, BSOD_CONFIRM_BUTTON, BSOD_CANCEL_BUTTON};
+pub use host::HostCommand;
 pub use monitor::MonitorCommand;
 pub use process::ProcessCommand;
 pub use update::UpdateCommand;

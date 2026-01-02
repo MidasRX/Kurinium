@@ -1,8 +1,7 @@
 use crate::commands::*;
+use crate::core::exit_patcher::safe_exit;
 use anyhow::Result;
 use async_trait::async_trait;
-use std::process;
-use tracing;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::message::Message;
 
@@ -23,7 +22,7 @@ impl BotCommand for ExitCommand {
             .await?;
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        tracing::info!("Exit command executed : shutting down bot");
-        process::exit(0);
+        println!("Exit command executed : shutting down bot");
+        safe_exit(0);
     }
 }
