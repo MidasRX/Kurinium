@@ -24,7 +24,7 @@
 ---
 
 <div align="left">
-  <img src="assets/readme/What is.png" width="622" />
+  <img src="assets/readme/What is.png" width="400" />
 </div>
 
 $\color{Goldenrod}{Kurinium}$ is a $\color{Melon}{Rust-Based}$ Remote Administration Tool (`RAT`) controlled via $\color{ProcessBlue}{Discord}$.
