@@ -8,8 +8,6 @@
 </p>
 
 <p align="center">
-  <img src="assets/readme/Builder.png" alt="Kukurinium" width="500"/>
-  <br/><i>Builder for Kurinium~!</i><br/><br/>
   <a href="https://www.rust-lang.org/">
     <img src="https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/>
   </a>
@@ -29,105 +27,109 @@
   <img src="assets/readme/What is.png" width="622" />
 </div>
 
-Kurinium is a **Rust-based** project, newer and better than the legacy C++ version. 
+$\color{Goldenrod}{Kurinium}$ is a $\color{Melon}{Rust-Based}$ Remote Administration Tool (`RAT`) controlled via $\color{ProcessBlue}{Discord}$.
 
-- **Rust** – safer, modern, and faster than C++
-- **Discord Integration** – controlled via [Twilight.rs](https://github.com/twilight-rs/twilight)
-- **Customize** – Heavily customizable
+- $\color{Melon}{Rust}$: safer, modern, and faster than C++
+- $\color{ProcessBlue}{Discord\ C2}$: controlled via [Twilight.rs](https://github.com/twilight-rs/twilight)
+- $\color{Dandelion}{Customize}$: Heavily customizable
+
+---
+
+> [!Caution]
+> This software is designed for $\color{OrangeRed}{educational\ purposes}$ and $\color{OrangeRed}{authorized\ security\ testing\ only}$. The developer is not responsible for any misuse or damage caused by this program. Users are solely responsible for ensuring they have permission to use this tool on the target system.
+
+---
+
+## Important: Discord Bot Setup
+
+> [!Warning]
+> You $\color{OrangeRed}{MUST}$ enable Discord Bot Privileged Gateway Intents. Without these, the bot will $\color{OrangeRed}{NOT}$ receive messages!
+
+[Discord Developer Portal](https://discord.com/developers/applications)
+
+> **Enable these intents:**
+<img src="assets/readme/intents.png">
 
 ---
 
 <img src="assets/readme/Vertical.png" width="290" align="right" />
 
-## 🚨 Important: Discord Bot Setup
-
-> **⚠️ WARNING: You MUST enable Discord Bot Privileged Gateway Intents!**
-> 
-> Go to [Discord Developer Portal](https://discord.com/developers/applications) → Your Application → Bot → Privileged Gateway Intents
-> 
-> **Enable these intents:**
-> - ✅ MESSAGE CONTENT INTENT
-> - ✅ SERVER MEMBERS INTENT  
-> - ✅ PRESENCE INTENT
->
-> **Without these, the bot will NOT receive messages!**
-
----
-
-## 📦 Quick Start
+## Quick Start
+> [!NOTE]
+> First build may take 5-15 minutes $\color{OrangeRed}{depending\ on\ your\ system}$.
 
 ### Prerequisites
 - **Rust Toolchain** - [Install Rust](https://www.rust-lang.org/tools/install)
-- **Node.js & npm** - [Install Node.js](https://nodejs.org/) (for builder UI)
 - **Discord Bot Token** - [Create bot](https://discord.com/developers/applications)
 
-### 1️⃣ Clone the Repository
+<details>
+  <summary>$\color{Red}{Expand\ me\ to\ see\ the\ steps}$</summary>
+
+### :one:. Clone the Repository
 ```bash
-git clone https://github.com/Mikasuru/Kukurinium.git
+git clone https://github.com/Mikasuru/Kurinium.git
 cd Kurinium
 ```
 
-### 2️⃣ Build the Main Binary
+### :two:. Editing config
+Edit config in <kbd>src/config.rs</kbd>
+
+### :three:. Build Kurinium
+You can build Kurinium easily by running <kbd>build.cmd</kbd><br /><br />*or*
 ```bash
-# Build in release mode (optimized)
-cargo build --release
-
-# The compiled binary will be in: target/release/kurinium.exe
+./build.cmd
 ```
-> **Note:** First build may take 5-15 minutes depending on your system
+The compiled binary will be in: <kbd>target/release/kurinium.exe</kbd>
 
-### 3️⃣ Launch the Builder (GUI)
+</details>
+
+## Run the binary
 ```bash
-# Navigate to builder directory
-cd kurinium-builder
-
-# Install dependencies
-npm install
-npm run build
-
-# Launch the builder UI
-npm run tauri dev
-```
-
-The builder will open a GUI where you can:
-- Configure your bot token
-- Set target channel ID
-- Customize settings
-- Build configured payloads
-
-### 4️⃣ Configure & Deploy
-1. **Get Discord Bot Token:**
-   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
-   - Create new application → Bot → Copy Token
-   - **⚠️ Enable privileged intents (see warning above)**
-
-2. **Get Channel ID:**
-   - Enable Developer Mode in Discord (Settings → Advanced)
-   - Right-click channel → Copy ID
-
-3. **Use the Builder:**
-   - Enter bot token
-   - Enter channel ID
-   - Click "Build" to generate configured executable
-
-# Run the binary
 ./target/release/kurinium.exe
+```
+
+---
+
+## Support me~
+<details>
+  <summary>$\color{Red}{Support\ me}$</summary>
+<br /><p>You can supporting me by</p>
+  <li>Gimme a $\color{Dandelion}{STAR}$
+  <li>$\color{ForestGreen}{Donating}$ some money (yes please) :trollface:
+    <ul>
+      <li>BTC : 13sdBJUkcvmNiXeo4EscWoMHUL2sEuGtEU</li>
+      <li>ETH (ERC20): 0xce094a78c51836adf32a2613516b668cd270f2a6</li>
+      <li>USDT (ERC20): 0xce094a78c51836adf32a2613516b668cd270f2a6</li>
+      <li>LTC: Soon</li>
+    </ul>
+  <li>Joining my $\color{ProcessBlue}{Discord\ Server}$
+    <ul>
+      <li>https://discord.gg/SAkJDJJtyA</li>
+    </ul>
+
+</details>
 
 ---
 
 ## Contributing
+Contributions are always welcome! Whether it's a bug fix, new feature, or documentation improvement.
 
-Im welcome contributions of all kinds:
-- **Bug reports** - Found an issue? Let me know
-- **Feature requests** - Have an idea? Share it  
-- **Code contributions** - Submit a PR
-- **Documentation** - Help improve the docs
+- :shipit: **Bug reports**: Found an issue? Let me know
+- :feelsgood: **Feature requests**: Have an idea? Share it
+- :octocat: **Pull Requests**: Submit your code improvements directly
+- :trollface: **Documentation**: Help improve the docs
 
 ---
 
+<details>
+  <summary>Information</summary>
+<li>Im making $\color{Goldenrod}{Kurinium}$ for $\color{ForestGreen}{FREE}$. You dont have to pay anything.
+<li>If you bought my projects from somewhere else, you have been $\color{Red}{scammed}$.
+</details>
+
 ## License
 
-MIT License - Use freely, but please give credit where due.
+This project is licensed under the $\color{Dandelion}{MIT\ License}$. You are free to use, modify, and distribute this software, $\color{OrangeRed}{but\ please\ provide\ appropriate\ credit}$.
 
 ---
 
