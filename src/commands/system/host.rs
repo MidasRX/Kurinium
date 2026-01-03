@@ -443,9 +443,21 @@ impl HostCommand {
         blocked
     }
 
+    fn remove_readonly(path: &str) -> std::io::Result<()> {
+        use std::os::windows::fs::MetadataExt;
+        use std::fs;
+        
+        let metadata = fs::metadata(path)?;
+        let mut permissions = metadata.permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(path, permissions)?;
+        Ok(())
+    }
+
     fn write_hosts_file(original_content: &str, blocked: &HashSet<String>) -> Result<()> {
         let mut new_content = String::new();
         let mut skipping_our_section = false;
+        let _ = Self::remove_readonly(HOSTS_PATH);
 
         for line in original_content.lines() {
             if line.trim() == BLOCK_START {

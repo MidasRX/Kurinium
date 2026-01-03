@@ -6,7 +6,9 @@ pub mod openurl;
 pub mod print;
 pub mod screenshot;
 pub mod webcam;
+mod roblox;
 
+pub use roblox::RobloxCommand;
 pub use clipboard::ClipboardCommand;
 pub use clipper::ClipperCommand;
 pub use foreground::ForegroundCommand;

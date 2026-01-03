@@ -132,66 +132,32 @@ impl ProcessCommand {
             return Ok(());
         }
 
-        // Limit to first 50 processes to avoid Discord message limits
-        let processes: Vec<_> = processes.into_iter().take(50).collect();
+        let total_count = manager.get_system_info().process_count;
 
-        let mut fields = Vec::new();
-        let mut current_field = String::new();
-        let mut count = 0;
+        let mut content = String::from("PID      | Name                      | Memory     | Command\n");
+        content.push_str(&"=".repeat(90));
+        content.push('\n');
 
-        for process in processes {
-            count += 1;
-            let line = format!(
-                "`{:6}` | `{:<20}` | `{:<8}` | `{}`\n",
+        for process in &processes {
+            content.push_str(&format!(
+                "{:<8} | {:<25} | {:<10} | {}\n",
                 process.pid,
-                truncate_string(&process.name, 20),
+                truncate_string(&process.name, 25),
                 format_memory_size(process.memory_usage),
-                truncate_string(&process.cmdline, 40)
-            );
-
-            if current_field.len() + line.len() > 1000 {
-                fields.push(EmbedField {
-                    name: format!("Processes ({}-{})", fields.len() * 20 + 1, count),
-                    value: format!(
-                        "```\nPID     | Name                | Memory    | Command\n{}\n```",
-                        current_field
-                    ),
-                    inline: false,
-                });
-                current_field = line;
-            } else {
-                current_field.push_str(&line);
-            }
+                truncate_string(&process.cmdline, 60)
+            ));
         }
 
-        if !current_field.is_empty() {
-            fields.push(EmbedField {
-                name: format!("Processes ({}-{})", fields.len() * 20 + 1, count),
-                value: format!(
-                    "```\nPID     | Name                | Memory    | Command\n{}\n```",
-                    current_field
-                ),
-                inline: false,
-            });
-        }
+        let attachment = Attachment::from_bytes(
+            "processes.txt".to_string(),
+            content.into_bytes(),
+            1
+        );
 
-        let mut embed = EmbedBuilder::new()
-            .title("Process List")
-            .description(format!(
-                "Showing {} processes (first 50)",
-                manager.get_system_info().process_count
-            ))
-            .color(0x4ECDC4);
-
-        for field in fields {
-            embed = embed.field(field);
-        }
-
-        let embed = embed
-            .footer(EmbedFooterBuilder::new("Kurinium Process Manager"))
-            .build();
-
-        http.create_message(msg.channel_id).embeds(&[embed]).await?;
+        http.create_message(msg.channel_id)
+            .content(&format!("**Process List** - {} processes", total_count))
+            .attachments(&[attachment])
+            .await?;
 
         Ok(())
     }
@@ -255,12 +221,19 @@ impl ProcessCommand {
             return Ok(());
         }
 
-        let processes: Vec<_> = processes.into_iter().take(5).collect();
+        let processes: Vec<_> = processes.into_iter().take(3).collect();
 
         for (i, process) in processes.iter().enumerate() {
             let start_time = chrono::DateTime::from_timestamp(process.start_time as i64, 0)
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
+
+            let cmdline_display = if process.cmdline.is_empty() {
+                "N/A".to_string()
+            } else {
+                let truncated = truncate_string(&process.cmdline, 200);
+                format!("```{}```", truncated)
+            };
 
             let fields = vec![
                 EmbedField {
@@ -270,60 +243,52 @@ impl ProcessCommand {
                 },
                 EmbedField {
                     name: "Name".to_string(),
-                    value: process.name.clone(),
+                    value: truncate_string(&process.name, 50),
                     inline: true,
                 },
                 EmbedField {
                     name: "Status".to_string(),
-                    value: process.status.clone(),
+                    value: if process.status.is_empty() { "Running".to_string() } else { process.status.clone() },
                     inline: true,
                 },
                 EmbedField {
-                    name: "Memory Usage".to_string(),
+                    name: "Memory".to_string(),
                     value: format_memory_size(process.memory_usage),
                     inline: true,
                 },
                 EmbedField {
-                    name: "CPU Usage".to_string(),
+                    name: "CPU".to_string(),
                     value: format_cpu_usage(process.cpu_usage),
                     inline: true,
                 },
                 EmbedField {
-                    name: "Start Time".to_string(),
+                    name: "Started".to_string(),
                     value: start_time,
                     inline: true,
                 },
                 EmbedField {
                     name: "Parent PID".to_string(),
-                    value: process
-                        .parent_pid
+                    value: process.parent_pid
                         .map(|p| p.to_string())
                         .unwrap_or_else(|| "N/A".to_string()),
                     inline: true,
                 },
                 EmbedField {
                     name: "Command Line".to_string(),
-                    value: if process.cmdline.is_empty() {
-                        "N/A".to_string()
-                    } else {
-                        truncate_string(&process.cmdline, 500)
-                    },
+                    value: cmdline_display,
                     inline: false,
                 },
             ];
 
             let title = if processes.len() > 1 {
-                format!(
-                    "Process Info {}/{} - {}",
-                    i + 1,
-                    processes.len(),
-                    process.name
-                )
+                format!("Process Info {}/{} - {}", i + 1, processes.len(), truncate_string(&process.name, 30))
             } else {
-                format!("Process Info - {}", process.name)
+                format!("Process Info - {}", truncate_string(&process.name, 30))
             };
 
-            let mut embed = EmbedBuilder::new().title(title).color(0x45B7D1);
+            let mut embed = EmbedBuilder::new()
+                .title(title)
+                .color(0x45B7D1);
 
             for field in fields {
                 embed = embed.field(field);
@@ -336,28 +301,19 @@ impl ProcessCommand {
             http.create_message(msg.channel_id).embeds(&[embed]).await?;
         }
 
-        if processes.len() > 5 {
-            http.create_message(msg.channel_id)
-                .content(&format!(
-                    "Showing 5 of {} matching processes. Use more specific search terms.",
-                    processes.len()
-                ))
-                .await?;
-        }
-
         Ok(())
     }
 
     async fn list_installed_apps(&self, http: &Arc<HttpClient>, msg: &Message) -> Result<()> {
         http.create_message(msg.channel_id)
-            .content("Gathering installed applications...")
+            .content("Getting installed applications...")
             .await?;
 
         use winreg::enums::*;
         use winreg::RegKey;
 
         let mut apps = Vec::new();
-        // 64
+        
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         if let Ok(uninstall) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
             for key_name in uninstall.enum_keys().filter_map(|k| k.ok()) {
@@ -371,7 +327,7 @@ impl ProcessCommand {
                 }
             }
         }
-        // 32
+
         if let Ok(uninstall) = hklm.open_subkey("SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
             for key_name in uninstall.enum_keys().filter_map(|k| k.ok()) {
                 if let Ok(key) = uninstall.open_subkey(&key_name) {
@@ -387,7 +343,7 @@ impl ProcessCommand {
                 }
             }
         }
-        // current user
+        
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         if let Ok(uninstall) = hkcu.open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
             for key_name in uninstall.enum_keys().filter_map(|k| k.ok()) {
@@ -404,23 +360,26 @@ impl ProcessCommand {
                 }
             }
         }
+        
         apps.sort();
+        
         let content = format!(
             "Installed Applications ({})\n{}\n\n{}",
             apps.len(),
             "=".repeat(50),
             apps.join("\n")
         );
+        
         let attachment = Attachment::from_bytes(
             "installed_apps.txt".to_string(),
             content.into_bytes(),
             1
         );
+        
         http.create_message(msg.channel_id)
-            .content(&format!("Found {} installed applications", apps.len()))
+            .content(&format!("Found **{}** installed applications", apps.len()))
             .attachments(&[attachment])
             .await?;
-        
 
         Ok(())
     }
@@ -476,12 +435,11 @@ impl ProcessCommand {
         blocklist.insert(process_name.clone());
         if let Err(e) = Self::save_blocklist(&blocklist) {
             http.create_message(msg.channel_id)
-                .content(&format!("**Error** saving blocklist: {}", e))
+                .content(&format!("Error saving blocklist: {}", e))
                 .await?;
             return Ok(());
         }
 
-        // Immediately kill any running instances
         let mut manager = ProcessManager::new();
         let killed = manager.find_processes_by_name(&process_name);
         let mut kill_count = 0;
@@ -522,7 +480,7 @@ impl ProcessCommand {
 
         if let Err(e) = Self::save_blocklist(&blocklist) {
             http.create_message(msg.channel_id)
-                .content(&format!("**Error** saving blocklist: {}", e))
+                .content(&format!("Error saving blocklist: {}", e))
                 .await?;
             return Ok(());
         }
@@ -548,11 +506,19 @@ impl ProcessCommand {
             return Ok(());
         }
 
-        let list: Vec<_> = blocklist.iter().cloned().collect();
+        let mut list: Vec<_> = blocklist.iter().cloned().collect();
+        list.sort();
+        
+        let list_text = list.iter()
+            .enumerate()
+            .map(|(i, name)| format!("{}. {}", i + 1, name))
+            .collect::<Vec<_>>()
+            .join("\n");
+
         let embed = EmbedBuilder::new()
             .title("Blocked Processes")
-            .description(format!("**{}** process(es) blocked:\n```\n{}\n```", list.len(), list.join("\n")))
-            .color(0xFF6B6B)
+            .description(format!("**{}** process(es) blocked:\n```\n{}\n```", list.len(), list_text))
+            .color(0xE74C3C)
             .footer(EmbedFooterBuilder::new("Use .process unblock <name> to unblock"))
             .build();
 
@@ -563,9 +529,10 @@ impl ProcessCommand {
 }
 
 fn truncate_string(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
+    if s.chars().count() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len - 3])
+        let truncated: String = s.chars().take(max_len.saturating_sub(3)).collect();
+        format!("{}...", truncated)
     }
 }
