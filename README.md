@@ -48,7 +48,7 @@ $\color{Goldenrod}{Kurinium}$ is a $\color{Melon}{Rust-Based}$ Remote Administra
 [Discord Developer Portal](https://discord.com/developers/applications)
 
 > **Enable these intents:**
-<img src="assets/readme/intents.png">
+<img src="assets/readme/intents.png" width="622">
 
 ---
 
