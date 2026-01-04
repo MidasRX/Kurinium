@@ -219,6 +219,8 @@ fn check_vm_files() -> Option<String> {
 
 fn check_vm_registry() -> Option<String> {
     use std::process::Command;
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     let checks: &[(&str, &str)] = &[
         // VMware
@@ -233,7 +235,11 @@ fn check_vm_registry() -> Option<String> {
     ];
 
     for (key, vm_type) in checks {
-        if let Ok(output) = Command::new("reg").args(["query", key]).output() {
+        if let Ok(output) = Command::new("reg")
+            .args(["query", key])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output() 
+        {
             if output.status.success() {
                 return Some(vm_type.to_string());
             }
