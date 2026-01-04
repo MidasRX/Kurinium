@@ -20,26 +20,24 @@ fn main() -> Result<()> {
     let config_path = Path::new("src/config.rs");
     let config_content = fs::read_to_string(config_path).context("Failed to read src/config.rs")?;
 
-    // Helper to get value from comment above encrypted function
-    // Format: "// ActualValue" followed by "pub fn key_name()"
-    let get_encrypted_val = |key: &str| -> String {
-        let lines: Vec<&str> = config_content.lines().collect();
-        for (i, line) in lines.iter().enumerate() {
-            if line.contains(&format!("pub fn {}()", key)) && i > 0 {
-                let comment_line = lines[i - 1].trim();
-                if comment_line.starts_with("//") {
-                    return comment_line.trim_start_matches("//").trim().to_string();
-                }
-            }
-        }
-        String::new()
+    let get_val = |key| {
+        config_content
+            .lines()
+            .find(|line| line.trim().starts_with(&format!("{}:", key)))
+            .and_then(|line| line.split(':').nth(1))
+            .and_then(|val| {
+                let cleaned = val.split("//").next().unwrap_or(val);
+                Some(cleaned.trim().trim_matches(',').trim_matches('"'))
+            })
+            .unwrap_or("")
+            .to_string()
     };
 
-    let file_ver_str = get_encrypted_val("file_version");
-    let file_name_str = get_encrypted_val("file_name");
-    let product_name = get_encrypted_val("product_name");
-    let description = get_encrypted_val("description");
-    let company_name = get_encrypted_val("company_name");
+    let file_ver_str = get_val("file_version");
+    let file_name_str = get_val("file_name");
+    let product_name = get_val("product_name");
+    let description = get_val("description");
+    let company_name = get_val("company_name");
 
     let token = std::env::var("KURINIUM_TOKEN").unwrap_or_else(|_| {
         config_content
