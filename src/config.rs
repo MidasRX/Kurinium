@@ -276,5 +276,5 @@ impl Config {
 
 #[cfg(not(debug_assertions))]
 impl Config {
-    pub const SHOW_CONSOLE: bool = true;
+    pub const SHOW_CONSOLE: bool = false;
 }
