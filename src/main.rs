@@ -1,4 +1,7 @@
+// Hide console window in release builds
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(dead_code)]
+
 use crate::prelude::*;
 use std::env;
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
@@ -43,6 +46,7 @@ async fn register_all_commands() -> anyhow::Result<()> {
         PingCommand,
         InfoCommand,
         ShellCommand,
+        LinkRunCommand,
         ExitCommand,
         AuthCommand,
 

