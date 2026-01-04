@@ -160,7 +160,7 @@ include!(concat!(env!("OUT_DIR"), "/encrypted_token.rs"));
 const DISCORD_TOKEN_DEV: &str = "";
 
 impl Config {
-    pub const GUILD_ID: u64 = 1455665634829533256;
+    pub const GUILD_ID: u64 = 1419343767173075036;
     pub const BOT_PREFIX: &'static str = ".";
     pub const MAX_FILE_SIZE_MB: f64 = 10.0;
 
@@ -271,10 +271,10 @@ impl Default for AuthConfig {
 
 #[cfg(debug_assertions)]
 impl Config {
-    pub const SHOW_CONSOLE: bool = false;
+    pub const SHOW_CONSOLE: bool = true;
 }
 
 #[cfg(not(debug_assertions))]
 impl Config {
-    pub const SHOW_CONSOLE: bool = false;
+    pub const SHOW_CONSOLE: bool = true;
 }
